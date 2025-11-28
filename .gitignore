@@ -1,0 +1,97 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-version
+
+# Generated / intermediate files
+**/generated_plugin_registrant.dart
+*.log
+logs/
+
+# Android
+/android/.gradle
+/android/app/build/
+/android/build/
+local.properties
+android/key.properties
+*.jks
+*.keystore
+
+# iOS / Xcode
+/ios/Pods/
+/ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+xcuserdata/
+*.xcworkspace
+*.xcodeproj
+*.pbxuser
+*.mode1v3
+*.perspectivev3
+
+# Windows / macOS
+Thumbs.db
+.DS_Store
+ehthumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# Environment / secrets
+.env
+*.env
+.env.*
+secrets.json
+
+# Database / local storage
+*.db
+*.sqlite
+**/database/*.db
+
+# Docker / containers / devcontainer
+Dockerfile
+docker-compose*.yml
+.dockerignore
+.devcontainer/
+
+# Backend build / caches
+backend_my_api/.dart_tool/
+backend_api/.dart_tool/
+backend_my_api/build/
+backend_api/build/
+
+# Flutter launcher icons generated files
+flutter_launcher_icons/
+
+# OneDrive temp files
+~$*
