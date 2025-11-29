@@ -20,7 +20,8 @@ class ApiService {
   // Use 'http://localhost:8080' for Chrome/Web
   // Use 'http://10.0.2.2:8080' for Android Emulator
   // Use 'http://192.168.1.X:8080' for Real Phone (Check ipconfig)
-  static const String baseUrl = 'http://localhost:8080';
+  //static const String baseUrl = 'http://localhost:8080';
+  static const String baseUrl = 'https://tap-collect.onrender.com';
 
   // 1. Health Check
   static Future<bool> checkHealth() async {
@@ -33,11 +34,12 @@ class ApiService {
   }
 
   // 2. Register User (With Normalization)
-  static Future<bool> registerUser(String name, String email, String password) async {
+  static Future<bool> registerUser(
+      String name, String email, String password) async {
     final url = Uri.parse('$baseUrl/auth/register');
     final normalizedName = _titleCase(name);
     final normalizedEmail = _normalizeEmail(email);
-    
+
     try {
       final response = await http.post(
         url,
@@ -56,17 +58,15 @@ class ApiService {
   }
 
   // 3. Login User (With Normalization)
-  static Future<Map<String, dynamic>?> loginUser(String email, String password) async {
+  static Future<Map<String, dynamic>?> loginUser(
+      String email, String password) async {
     final url = Uri.parse('$baseUrl/auth/login');
     try {
       final normalizedEmail = _normalizeEmail(email);
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": normalizedEmail,
-          "password": password
-        }),
+        body: jsonEncode({"email": normalizedEmail, "password": password}),
       );
 
       if (response.statusCode == 200) {
@@ -79,7 +79,8 @@ class ApiService {
   }
 
   // 4. Update User (RESTORED - Critical for Business Activation)
-  static Future<bool> updateUser(String userId, Map<String, dynamic> data) async {
+  static Future<bool> updateUser(
+      String userId, Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/users/$userId');
     try {
       final response = await http.patch(
@@ -101,8 +102,8 @@ class ApiService {
 
   // 5. Earn Points
   static Future<bool> earnPoints({
-    required String userId, 
-    required int amount, 
+    required String userId,
+    required int amount,
     String businessId = "sample-biz",
   }) async {
     final url = Uri.parse('$baseUrl/transactions');
@@ -118,7 +119,7 @@ class ApiService {
           "description": "NFC Tap Collection",
         }),
       );
-      
+
       if (response.statusCode == 201) {
         print("✅ Points Saved: ${response.body}");
         return true;
@@ -162,7 +163,8 @@ class ApiService {
   }
 
   // 8. Upload avatar
-  static Future<String?> uploadAvatar(String userId, String filename, String base64Data) async {
+  static Future<String?> uploadAvatar(
+      String userId, String filename, String base64Data) async {
     final url = Uri.parse('$baseUrl/users/$userId/avatar');
     try {
       final response = await http.post(url,
