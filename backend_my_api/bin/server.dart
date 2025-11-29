@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:dotenv/dotenv.dart'; 
+import 'package:dotenv/dotenv.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
@@ -14,7 +14,9 @@ String? _idFromInsertResult(dynamic res, Map<String, dynamic> doc) {
         ? res['insertedId']
         : (res is Map && res.containsKey('id'))
             ? res['id']
-            : (res is Object) ? (res as dynamic).id : null;
+            : (res is Object)
+                ? (res as dynamic).id
+                : null;
     if (idProp != null) return idProp.toString();
   } catch (_) {}
   return doc['_id']?.toString();
@@ -77,7 +79,9 @@ void main(List<String> args) async {
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    if (data['email'] == null || data['name'] == null || data['password'] == null) {
+    if (data['email'] == null ||
+        data['name'] == null ||
+        data['password'] == null) {
       return Response(400,
           body: jsonEncode({'error': 'email, name, and password required'}));
     }
@@ -118,14 +122,16 @@ void main(List<String> args) async {
     final data = jsonDecode(body) as Map<String, dynamic>;
 
     if (data['email'] == null || data['password'] == null) {
-      return Response(400, body: jsonEncode({'error': 'email and password required'}));
+      return Response(400,
+          body: jsonEncode({'error': 'email and password required'}));
     }
 
     final email = _normalizeEmail(data['email'] as String?);
     final user = await usersCol.findOne(where.eq('email', email));
 
     if (user == null || user['password'] != data['password']) {
-      return Response(401, body: jsonEncode({'error': 'Invalid email or password'}));
+      return Response(401,
+          body: jsonEncode({'error': 'Invalid email or password'}));
     }
 
     final result = _mapDoc(user);
@@ -138,7 +144,7 @@ void main(List<String> args) async {
     final docs = await usersCol.find().toList();
     final result = docs.map((d) {
       var map = _mapDoc(Map<String, dynamic>.from(d));
-      map.remove('password'); 
+      map.remove('password');
       return map;
     }).toList();
     return Response.ok(jsonEncode(result));
@@ -164,7 +170,7 @@ void main(List<String> args) async {
       final body = await req.readAsString();
       final data = jsonDecode(body) as Map<String, dynamic>;
       final objId = ObjectId.parse(id);
-      
+
       final updateData = <String, dynamic>{
         'updated_at': DateTime.now().toIso8601String()
       };
@@ -177,7 +183,7 @@ void main(List<String> args) async {
 
       // FIX: Use raw $set map instead of modify.setAll (which doesn't exist)
       await usersCol.updateOne(where.eq('_id', objId), {r'$set': updateData});
-      
+
       return Response.ok(jsonEncode({'status': 'updated'}));
     } catch (e) {
       return Response(400, body: jsonEncode({'error': 'update failed'}));
@@ -190,8 +196,11 @@ void main(List<String> args) async {
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    if (data['user_id'] == null || data['business_id'] == null || data['type'] == null) {
-      return Response(400, body: jsonEncode({'error': 'user_id, business_id, type required'}));
+    if (data['user_id'] == null ||
+        data['business_id'] == null ||
+        data['type'] == null) {
+      return Response(400,
+          body: jsonEncode({'error': 'user_id, business_id, type required'}));
     }
 
     final String userIdStr = data['user_id'] as String;
@@ -201,10 +210,13 @@ void main(List<String> args) async {
     // compute points: prefer explicit 'points', else use amount_spent * business.points_per_dollar, else 1
     int points = 0;
     if (data.containsKey('points')) {
-      points = (data['points'] is num) ? (data['points'] as num).toInt() : int.tryParse('${data['points']}') ?? 0;
+      points = (data['points'] is num)
+          ? (data['points'] as num).toInt()
+          : int.tryParse('${data['points']}') ?? 0;
     } else if (data.containsKey('amount_spent')) {
       final amt = double.tryParse('${data['amount_spent']}') ?? 0.0;
-      final biz = await businessesCol.findOne(where.eq('_id', ObjectId.tryParse(businessId) ?? businessId));
+      final biz = await businessesCol.findOne(
+          where.eq('_id', ObjectId.tryParse(businessId) ?? businessId));
       final ppd = (biz != null && biz['points_per_dollar'] != null)
           ? (double.tryParse('${biz['points_per_dollar']}') ?? 1.0)
           : 1.0;
@@ -237,7 +249,9 @@ void main(List<String> args) async {
     try {
       // resolve ObjectId if possible
       final userObjId = ObjectId.tryParse(userIdStr);
-      final selector = userObjId != null ? where.eq('_id', userObjId) : where.eq('_id', userIdStr);
+      final selector = userObjId != null
+          ? where.eq('_id', userObjId)
+          : where.eq('_id', userIdStr);
 
       if (type == 'REDEEM') {
         // ensure balance won't go negative: use findOneAndUpdate-like pattern if driver supports it,
@@ -246,42 +260,52 @@ void main(List<String> args) async {
         if (userDoc == null) {
           return Response(404, body: jsonEncode({'error': 'user not found'}));
         }
-        final current = (userDoc['points_balance'] is num) ? (userDoc['points_balance'] as num).toInt() : 0;
+        final current = (userDoc['points_balance'] is num)
+            ? (userDoc['points_balance'] as num).toInt()
+            : 0;
         if (current < points) {
-          return Response(400, body: jsonEncode({'error': 'insufficient points', 'balance': current}));
+          return Response(400,
+              body: jsonEncode(
+                  {'error': 'insufficient points', 'balance': current}));
         }
       }
 
       // atomic increment (works for EARN and REDEEM if REDEEM uses negative points)
       final incValue = (type == 'REDEEM') ? -points : points;
-      await usersCol.updateOne(selector, modify.inc('points_balance', incValue));
+      await usersCol.updateOne(
+          selector, modify.inc('points_balance', incValue));
 
       // return the updated balance
       final updatedUser = await usersCol.findOne(selector);
-      final newBalance = (updatedUser != null && updatedUser['points_balance'] != null)
-          ? updatedUser['points_balance']
-          : 0;
+      final newBalance =
+          (updatedUser != null && updatedUser['points_balance'] != null)
+              ? updatedUser['points_balance']
+              : 0;
       final result = Map<String, dynamic>.from(doc);
-      result['id'] = await _idFromInsertResult(null, doc) ?? '';
+      result['id'] = _idFromInsertResult(null, doc) ?? '';
       result['new_balance'] = newBalance;
       return Response(201, body: jsonEncode(result));
     } catch (e) {
       // log and return error but transaction record stays for audit
       stderr.writeln('Error updating points balance: $e');
-      return Response(500, body: jsonEncode({'error': 'failed to update balance'}));
+      return Response(500,
+          body: jsonEncode({'error': 'failed to update balance'}));
     }
   });
 
   router.get('/users/<user_id>/transactions', (req, String userId) async {
-    final docs = await transactionsCol.find(where.eq('user_id', userId)).toList();
-    final result = docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
+    final docs =
+        await transactionsCol.find(where.eq('user_id', userId)).toList();
+    final result =
+        docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
     return Response.ok(jsonEncode(result));
   });
 
   // --- BUSINESS ROUTES ---
   router.get('/businesses', (_) async {
     final docs = await businessesCol.find().toList();
-    final result = docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
+    final result =
+        docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
     return Response.ok(jsonEncode(result));
   });
 
@@ -290,7 +314,8 @@ void main(List<String> args) async {
     final data = jsonDecode(body) as Map<String, dynamic>;
 
     if (data['name'] == null || data['address'] == null) {
-      return Response(400, body: jsonEncode({'error': 'name and address required'}));
+      return Response(400,
+          body: jsonEncode({'error': 'name and address required'}));
     }
 
     final now = DateTime.now().toIso8601String();
@@ -318,7 +343,8 @@ void main(List<String> args) async {
     try {
       final objId = ObjectId.parse(id);
       final doc = await businessesCol.findOne(where.eq('_id', objId));
-      if (doc == null) return Response.notFound(jsonEncode({'error': 'not found'}));
+      if (doc == null)
+        return Response.notFound(jsonEncode({'error': 'not found'}));
       final result = _mapDoc(doc);
       return Response.ok(jsonEncode(result));
     } catch (e) {
@@ -331,8 +357,11 @@ void main(List<String> args) async {
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    if (data['email'] == null || data['name'] == null || data['business_id'] == null) {
-      return Response(400, body: jsonEncode({'error': 'email, name, business_id required'}));
+    if (data['email'] == null ||
+        data['name'] == null ||
+        data['business_id'] == null) {
+      return Response(400,
+          body: jsonEncode({'error': 'email, name, business_id required'}));
     }
 
     final now = DateTime.now().toIso8601String();
@@ -352,16 +381,22 @@ void main(List<String> args) async {
     return Response(201, body: jsonEncode(result));
   });
 
-  router.get('/merchants/business/<business_id>', (req, String businessId) async {
-    final docs = await merchantsCol.find(where.eq('business_id', businessId)).toList();
-    final result = docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
+  router.get('/merchants/business/<business_id>',
+      (req, String businessId) async {
+    final docs =
+        await merchantsCol.find(where.eq('business_id', businessId)).toList();
+    final result =
+        docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
     return Response.ok(jsonEncode(result));
   });
 
   // --- REWARD ROUTES ---
-  router.get('/businesses/<business_id>/rewards', (req, String businessId) async {
-    final docs = await rewardsCol.find(where.eq('business_id', businessId)).toList();
-    final result = docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
+  router.get('/businesses/<business_id>/rewards',
+      (req, String businessId) async {
+    final docs =
+        await rewardsCol.find(where.eq('business_id', businessId)).toList();
+    final result =
+        docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
     return Response.ok(jsonEncode(result));
   });
 
@@ -369,8 +404,12 @@ void main(List<String> args) async {
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    if (data['business_id'] == null || data['title'] == null || data['points_cost'] == null) {
-      return Response(400, body: jsonEncode({'error': 'business_id, title, points_cost required'}));
+    if (data['business_id'] == null ||
+        data['title'] == null ||
+        data['points_cost'] == null) {
+      return Response(400,
+          body: jsonEncode(
+              {'error': 'business_id, title, points_cost required'}));
     }
 
     final now = DateTime.now().toIso8601String();
@@ -397,13 +436,15 @@ void main(List<String> args) async {
   // --- VOUCHER ROUTES ---
   router.get('/vouchers', (_) async {
     final docs = await vouchersCol.find().toList();
-    final result = docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
+    final result =
+        docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
     return Response.ok(jsonEncode(result));
   });
 
   router.get('/users/<user_id>/vouchers', (req, String userId) async {
     final docs = await vouchersCol.find(where.eq('user_id', userId)).toList();
-    final result = docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
+    final result =
+        docs.map((d) => _mapDoc(Map<String, dynamic>.from(d))).toList();
     return Response.ok(jsonEncode(result));
   });
 
@@ -411,8 +452,11 @@ void main(List<String> args) async {
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    if (data['user_id'] == null || data['reward_id'] == null || data['code'] == null) {
-      return Response(400, body: jsonEncode({'error': 'user_id, reward_id, code required'}));
+    if (data['user_id'] == null ||
+        data['reward_id'] == null ||
+        data['code'] == null) {
+      return Response(400,
+          body: jsonEncode({'error': 'user_id, reward_id, code required'}));
     }
 
     final now = DateTime.now().toIso8601String();
@@ -444,13 +488,15 @@ void main(List<String> args) async {
 
       final updateMap = {'updated_at': now};
       if (data['status'] != null) updateMap['status'] = data['status'];
-      if (data['redeemed_at'] != null) updateMap['redeemed_at'] = data['redeemed_at'];
+      if (data['redeemed_at'] != null)
+        updateMap['redeemed_at'] = data['redeemed_at'];
 
       // FIX: Use raw $set map instead of modify.setAll
       await vouchersCol.updateOne(where.eq('_id', objId), {r'$set': updateMap});
       final updated = await vouchersCol.findOne(where.eq('_id', objId));
 
-      if (updated == null) return Response.notFound(jsonEncode({'error': 'not found'}));
+      if (updated == null)
+        return Response.notFound(jsonEncode({'error': 'not found'}));
       final result = _mapDoc(updated);
       return Response.ok(jsonEncode(result));
     } catch (e) {
@@ -483,8 +529,10 @@ Handler _corsMiddleware(Handler innerHandler) {
     if (request.method == 'OPTIONS') {
       return Response.ok('', headers: {
         'access-control-allow-origin': '*',
-        'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'access-control-allow-headers': 'Origin, Content-Type, Accept, Authorization',
+        'access-control-allow-methods':
+            'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        'access-control-allow-headers':
+            'Origin, Content-Type, Accept, Authorization',
       });
     }
     final resp = await innerHandler(request);
