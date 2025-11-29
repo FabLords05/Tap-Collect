@@ -2,6 +2,7 @@ import 'package:grove_rewards/models/transaction.dart';
 import 'package:grove_rewards/services/auth_service.dart';
 import 'package:grove_rewards/services/storage_service.dart';
 import 'package:grove_rewards/services/transaction_service.dart';
+import 'package:grove_rewards/services/api_service.dart';
 import 'package:uuid/uuid.dart';
 
 class PointsService {
@@ -43,8 +44,14 @@ class PointsService {
         updatedAt: DateTime.now(),
       );
 
-      // Save transaction
+      // Save transaction locally
       await TransactionService.addTransaction(transaction);
+
+      // Also send to backend so server-side DB (MongoDB) stores the transaction
+      // Fire-and-forget: don't block local UX, but attempt to persist remotely
+      try {
+        await ApiService.earnPoints(userId: user.id, amount: points, businessId: businessId);
+      } catch (_) {}
 
       // Update balance (per-user)
       await StorageService.savePointsBalanceForUser(user.id, newBalance);
