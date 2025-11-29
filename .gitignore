@@ -79,7 +79,6 @@ secrets.json
 **/database/*.db
 
 # Docker / containers / devcontainer
-Dockerfile
 docker-compose*.yml
 .dockerignore
 .devcontainer/
