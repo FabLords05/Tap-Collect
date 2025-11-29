@@ -231,6 +231,7 @@ void main(List<String> args) async {
 
     // Insert transaction first (so we keep a record even if balance update fails)
     await transactionsCol.insertOne(doc);
+    print("✅ Transaction saved: $points points");
 
     // Try to update user's balance atomically
     try {

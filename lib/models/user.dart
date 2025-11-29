@@ -30,8 +30,17 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // --- FIX START: Sanitize the ID ---
+    String rawId = json['id'].toString();
+    if (rawId.startsWith('ObjectId("')) {
+      // Extract the 24-character hex string from inside the quotes
+      // Format: ObjectId("656...") -> 656...
+      rawId = rawId.substring(10, 34);
+    }
+    // --- FIX END ---
+
     return User(
-      id: json['id'] as String,
+      id: rawId, // Use the clean ID
       email: json['email'] as String,
       name: json['name'] as String,
       avatar: json['avatar'] as String?,
