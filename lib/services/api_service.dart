@@ -20,8 +20,8 @@ class ApiService {
   // Use 'http://localhost:8080' for Chrome/Web
   // Use 'http://10.0.2.2:8080' for Android Emulator
   // Use 'http://192.168.1.X:8080' for Real Phone (Check ipconfig)
-  //static const String baseUrl = 'http://localhost:8080';
-  static const String baseUrl = 'https://tap-collect.onrender.com';
+  static const String baseUrl = 'http://localhost:8080';
+  //static const String baseUrl = 'https://tap-collect.onrender.com';
 
   // 1. Health Check
   static Future<bool> checkHealth() async {

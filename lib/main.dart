@@ -13,28 +13,36 @@ import 'package:http/http.dart' as http;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await AuthService.initialize();
-  await MerchantAuthService.initialize();
-
-  // --- NEW: HARDWARE DETECTION LOGIC ---
-  // 1. Check if we already have a mode saved
-  String? currentMode = await StorageService.getAppMode();
-
-  // 2. If NO mode is saved (First install), detect hardware
-  if (currentMode == null) {
-    bool isNfcAvailable = await NfcManager.instance.isAvailable();
-
-    if (isNfcAvailable) {
-      print("📱 NFC Detected: Defaulting to TAP MODE");
-      await StorageService.saveAppMode('tap');
-    } else {
-      print("📷 No NFC Detected: Defaulting to QR MODE");
-      await StorageService.saveAppMode('qr');
-    }
+  // Initialize auth and merchant services
+  try {
+    await AuthService.initialize();
+  } catch (e) {
+    print('⚠️ AuthService init error: $e');
   }
-  // -------------------------------------
+  
+  try {
+    await MerchantAuthService.initialize();
+  } catch (e) {
+    print('⚠️ MerchantAuthService init error: $e');
+  }
 
-  // Migrate any global points balance into the current user's storage (one-time)
+  // --- HARDWARE DETECTION LOGIC ---
+  var appMode = 'tap';
+  try {
+    String? currentMode = await StorageService.getAppMode();
+    if (currentMode == null) {
+      bool isNfcAvailable = await NfcManager.instance.isAvailable();
+      appMode = isNfcAvailable ? 'tap' : 'qr';
+      await StorageService.saveAppMode(appMode);
+      print(isNfcAvailable ? "📱 NFC Detected: TAP MODE" : "📷 No NFC: QR MODE");
+    } else {
+      appMode = currentMode;
+    }
+  } catch (e) {
+    print('⚠️ App mode detection error: $e');
+  }
+
+  // Migrate points balance (optional, non-blocking)
   var migratedPoints = false;
   try {
     final user = AuthService.currentUser;
@@ -47,20 +55,20 @@ Future<void> main() async {
         migratedPoints = true;
       }
     }
-  } catch (_) {
-    // Ignore migration errors — proceed with app startup
+  } catch (e) {
+    print('⚠️ Points migration error: $e');
   }
-  // Initialize local database (best-effort; don't block startup on failure)
+
+  // Initialize local database (optional, non-blocking)
   try {
     await LocalDatabase.instance.database;
-    // optional: insert a sample business for quick testing (no-op if exists)
     await LocalDatabase.instance.upsertBusiness({
       'id': 'sample-biz',
       'name': 'Sample Business',
       'meta': '{}',
     });
-  } catch (_) {
-    // Silently ignore DB init errors so the app can still run
+  } catch (e) {
+    print('⚠️ DB init error: $e');
   }
 
   runApp(MyApp(migratedPoints: migratedPoints));
@@ -117,20 +125,9 @@ class NfcTapHandler extends StatefulWidget {
 }
 
 class _NfcTapHandlerState extends State<NfcTapHandler> {
-  int _pointsBalance = 0;
-
   @override
   void initState() {
     super.initState();
-    _loadBalance();
-  }
-
-  Future<void> _loadBalance() async {
-    final user = AuthService.currentUser;
-    if (user != null) {
-      final bal = await StorageService.loadPointsBalanceForUser(user.id);
-      setState(() => _pointsBalance = bal);
-    }
   }
 
   // Call this from NFC code:

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:grove_rewards/screens/home/dashboard_screen.dart';
 import 'package:grove_rewards/screens/home/rewards_screen.dart';
 import 'package:grove_rewards/screens/home/history_screen.dart';
+import 'package:grove_rewards/services/storage_service.dart';
+import 'package:grove_rewards/widgets/qr_collection_widget.dart';
 import 'package:grove_rewards/screens/home/profile_screen.dart';
 import 'package:grove_rewards/widgets/nfc_collection_widget.dart';
 import 'package:grove_rewards/services/nfc_service.dart';
@@ -14,7 +16,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   bool _nfcPressed = false;
   late final AnimationController _pulseController;
@@ -50,12 +53,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
   }
 
-  Future<void> _openNfcCollectorSheet() async {
+  Future<void> _openCollectorSheet() async {
     final theme = Theme.of(context);
+    String? appMode = await StorageService.getAppMode();
     await NFCService.initialize();
 
     if (!mounted) return;
-    
+
     await showModalBottomSheet(
       context: context,
       useSafeArea: true,
@@ -79,14 +83,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
               const SizedBox(height: 16),
-              NFCCollectionWidget(
-                onPointsCollected: (points) {
-                  Navigator.of(sheetContext).maybePop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Collected +$points points')),
-                  );
-                },
-              ),
+              if (appMode == 'tap')
+                NFCCollectionWidget(
+                  onPointsCollected: (points) {
+                    Navigator.of(sheetContext).maybePop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Collected +$points points')),
+                    );
+                  },
+                )
+              else
+                QRCollectionWidget(
+                  businessId: 'sample-biz',
+                  onPointsCollected: (points) {
+                    Navigator.of(sheetContext).maybePop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Collected +$points points via QR')),
+                    );
+                  },
+                ),
             ],
           ),
         );
@@ -130,7 +146,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               alignment: Alignment.center,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -168,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     onTapDown: (_) => setState(() => _nfcPressed = true),
                     onTapCancel: () => setState(() => _nfcPressed = false),
                     onTapUp: (_) => setState(() => _nfcPressed = false),
-                    onTap: _openNfcCollectorSheet,
+                    onTap: _openCollectorSheet,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -186,7 +203,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   width: 80,
                                   height: 80,
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary.withValues(alpha: 0.20),
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.20),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -206,13 +224,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: theme.colorScheme.primary.withValues(alpha: 0.22),
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.22),
                                   blurRadius: 18,
                                   offset: const Offset(0, 10),
                                 ),
                               ],
                               border: Border.all(
-                                color: theme.colorScheme.onPrimary.withValues(alpha: 0.10),
+                                color: theme.colorScheme.onPrimary
+                                    .withValues(alpha: 0.10),
                                 width: 1,
                               ),
                             ),
@@ -255,7 +275,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? theme.colorScheme.primaryContainer : Colors.transparent,
+          color: isActive
+              ? theme.colorScheme.primaryContainer
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -263,7 +285,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           children: [
             Icon(
               isActive ? activeIcon : icon,
-              color: isActive ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              color: isActive
+                  ? theme.colorScheme.onPrimaryContainer
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
               size: 24,
             ),
             if (isActive) ...[

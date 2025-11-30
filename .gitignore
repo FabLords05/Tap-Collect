@@ -78,6 +78,9 @@ secrets.json
 *.sqlite
 **/database/*.db
 
+# Ignore custom API service file
+api_sevice.dart
+
 # Docker / containers / devcontainer
 docker-compose*.yml
 .dockerignore
