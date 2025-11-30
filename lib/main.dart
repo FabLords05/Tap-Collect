@@ -1,22 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:nfc_manager/nfc_manager.dart'; // Import NFC Manager
 import 'package:grove_rewards/theme.dart';
 import 'package:grove_rewards/services/auth_service.dart';
-import 'package:grove_rewards/services/storage_service.dart';
 import 'package:grove_rewards/services/merchant_auth_service.dart';
 import 'package:grove_rewards/services/local_database.dart';
+import 'package:grove_rewards/services/storage_service.dart'; // Import Storage
 import 'package:grove_rewards/screens/auth/login_screen.dart';
 import 'package:grove_rewards/screens/home/home_screen.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-
-
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await AuthService.initialize();
-  await MerchantAuthService.initialize(); 
-  
+  await MerchantAuthService.initialize();
+
+  // --- NEW: HARDWARE DETECTION LOGIC ---
+  // 1. Check if we already have a mode saved
+  String? currentMode = await StorageService.getAppMode();
+
+  // 2. If NO mode is saved (First install), detect hardware
+  if (currentMode == null) {
+    bool isNfcAvailable = await NfcManager.instance.isAvailable();
+
+    if (isNfcAvailable) {
+      print("📱 NFC Detected: Defaulting to TAP MODE");
+      await StorageService.saveAppMode('tap');
+    } else {
+      print("📷 No NFC Detected: Defaulting to QR MODE");
+      await StorageService.saveAppMode('qr');
+    }
+  }
+  // -------------------------------------
+
   // Migrate any global points balance into the current user's storage (one-time)
   var migratedPoints = false;
   try {
@@ -50,7 +67,8 @@ Future<void> main() async {
 }
 
 // Add a global key so other code (NFC handler) can call into the widget state
-final GlobalKey<_NfcTapHandlerState> nfcTapKey = GlobalKey<_NfcTapHandlerState>();
+final GlobalKey<_NfcTapHandlerState> nfcTapKey =
+    GlobalKey<_NfcTapHandlerState>();
 
 class MyApp extends StatelessWidget {
   final bool migratedPoints;
@@ -76,7 +94,8 @@ class MyApp extends StatelessWidget {
             final messenger = ScaffoldMessenger.maybeOf(context);
             if (messenger != null) {
               messenger.showSnackBar(
-                const SnackBar(content: Text('Your points were migrated to your account')),
+                const SnackBar(
+                    content: Text('Your points were migrated to your account')),
               );
               _migrationShown = true;
             }
@@ -140,7 +159,8 @@ class _NfcTapHandlerState extends State<NfcTapHandler> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tap recorded but failed to update balance')),
+        const SnackBar(
+            content: Text('Tap recorded but failed to update balance')),
       );
     }
   }

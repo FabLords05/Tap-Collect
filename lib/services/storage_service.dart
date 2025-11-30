@@ -8,6 +8,7 @@ class StorageService {
   static const String _vouchersKey = 'user_vouchers';
   static const String _businessesKey = 'businesses';
   static const String _pointsBalanceKey = 'points_balance';
+  static const String _appModeKey = 'app_mode';
 
   static Future<SharedPreferences> get _prefs async {
     return await SharedPreferences.getInstance();
@@ -34,7 +35,8 @@ class StorageService {
   }
 
   // Generic save list method
-  static Future<void> saveList(String key, List<Map<String, dynamic>> list) async {
+  static Future<void> saveList(
+      String key, List<Map<String, dynamic>> list) async {
     final prefs = await _prefs;
     await prefs.setString(key, jsonEncode(list));
   }
@@ -48,8 +50,7 @@ class StorageService {
         final decoded = jsonDecode(data);
         if (decoded is List) {
           return List<Map<String, dynamic>>.from(
-            decoded.map((item) => Map<String, dynamic>.from(item))
-          );
+              decoded.map((item) => Map<String, dynamic>.from(item)));
         }
       }
       return [];
@@ -86,14 +87,15 @@ class StorageService {
   }
 
   // Per-user points balance (stored as key: points_balance_{userId})
-  static Future<void> savePointsBalanceForUser(String userId, int balance) async {
+  static Future<void> savePointsBalanceForUser(
+      String userId, int balance) async {
     final prefs = await _prefs;
-    await prefs.setInt('\${_pointsBalanceKey}_$userId', balance);
+    await prefs.setInt('${_pointsBalanceKey}_$userId', balance);
   }
 
   static Future<int> loadPointsBalanceForUser(String userId) async {
     final prefs = await _prefs;
-    return prefs.getInt('\${_pointsBalanceKey}_$userId') ?? 0;
+    return prefs.getInt('${_pointsBalanceKey}_$userId') ?? 0;
   }
 
   // Clear the old global points balance key (used during migration)
@@ -103,7 +105,8 @@ class StorageService {
   }
 
   // Transactions methods
-  static Future<void> saveTransactions(List<Map<String, dynamic>> transactions) async {
+  static Future<void> saveTransactions(
+      List<Map<String, dynamic>> transactions) async {
     await saveList(_transactionsKey, transactions);
   }
 
@@ -130,12 +133,24 @@ class StorageService {
   }
 
   // Businesses methods
-  static Future<void> saveBusinesses(List<Map<String, dynamic>> businesses) async {
+  static Future<void> saveBusinesses(
+      List<Map<String, dynamic>> businesses) async {
     await saveList(_businessesKey, businesses);
   }
 
   static Future<List<Map<String, dynamic>>> loadBusinesses() async {
     return await loadList(_businessesKey);
+  }
+
+  // App Mode methods (Retained for NFC/QR functionality)
+  static Future<void> saveAppMode(String mode) async {
+    final prefs = await _prefs;
+    await prefs.setString(_appModeKey, mode);
+  }
+
+  static Future<String?> getAppMode() async {
+    final prefs = await _prefs;
+    return prefs.getString(_appModeKey);
   }
 
   // Clear all data
