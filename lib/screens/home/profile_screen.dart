@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For Clipboard
-import 'dart:convert'; // For JSON formatting
+import 'dart:convert'; // For JSON formatting and base64Decode
 import 'package:image_picker/image_picker.dart';
 import 'package:grove_rewards/services/auth_service.dart';
 import 'package:grove_rewards/services/api_service.dart';
 import 'package:grove_rewards/services/points_service.dart';
+import 'package:grove_rewards/services/voucher_service.dart'; // Added back
+import 'package:grove_rewards/services/app_logger.dart'; // Added back
 import 'package:grove_rewards/screens/auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -15,27 +17,104 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isLoading = false;
-  int _balance = 0;
+  bool _isLoading = true;
+  Map<String, int> _pointsSummary = {};
+  Map<String, int> _voucherStats = {};
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadProfileData();
   }
 
-  Future<void> _loadData() async {
-    // Refresh points balance
-    final points = await PointsService.getBalance();
-    if (mounted) {
-      setState(() {
-        _balance = points;
-      });
+  Future<void> _loadProfileData() async {
+    try {
+      // Fetching all detailed stats
+      final pointsSummary = await PointsService.getPointsSummary();
+      final voucherStats = await VoucherService.getVoucherStats();
+
+      if (mounted) {
+        setState(() {
+          _pointsSummary = pointsSummary;
+          _voucherStats = voucherStats;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  // --- EDIT NAME LOGIC ---
+  // --- HELPER FOR PHOTOS ---
+  ImageProvider? _getAvatarImage(String? avatar) {
+    if (avatar == null || avatar.isEmpty) return null;
+    if (avatar.startsWith('http')) {
+      return NetworkImage(avatar);
+    }
+    try {
+      return MemoryImage(base64Decode(avatar));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // --- UPLOAD AVATAR LOGIC ---
+  Future<void> _pickAndUploadAvatar() async {
+    final user = AuthService.currentUser;
+    if (user == null) return;
+
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 70,
+    );
+
+    if (image == null) return;
+
+    // Show loading indicator
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    navigator.push(DialogRoute<void>(
+        context: context,
+        builder: (c) => const Center(child: CircularProgressIndicator())));
+
+    try {
+      final bytes = await image.readAsBytes();
+      final base64Image = base64Encode(bytes);
+
+      final avatarPath =
+          await ApiService.uploadAvatar(user.id, image.name, base64Image);
+
+      navigator.pop(); // Dismiss loading
+
+      if (avatarPath != null) {
+        final updatedUser = user.copyWith(avatar: avatarPath);
+        await AuthService.updateCurrentUser(updatedUser);
+
+        setState(() {}); // Refresh UI to show new image
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Avatar updated successfully!')),
+        );
+      } else {
+        throw Exception("Upload failed");
+      }
+    } catch (e) {
+      navigator.pop(); // Dismiss loading on error
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to upload image. Server error.')),
+      );
+    }
+  }
+
+  // --- EDIT PROFILE LOGIC ---
   void _showEditProfileDialog() {
+    final theme = Theme.of(context);
     final user = AuthService.currentUser;
     final nameController = TextEditingController(text: user?.name ?? '');
 
@@ -62,9 +141,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final newName = nameController.text.trim();
               if (newName.isEmpty) return;
 
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context);
               _updateProfileField(name: newName);
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+            ),
             child: const Text('Save'),
           ),
         ],
@@ -72,60 +155,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // --- UPLOAD AVATAR LOGIC ---
-  Future<void> _pickAndUploadAvatar() async {
-    final user = AuthService.currentUser;
-    if (user == null) return;
-
-    final picker = ImagePicker();
-    // Pick image from gallery
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 512, // Limit size for performance
-      maxHeight: 512,
-      imageQuality: 70,
-    );
-
-    if (image == null) return; // User cancelled
-
-    setState(() => _isLoading = true);
-
-    try {
-      // 1. Read file as bytes
-      final bytes = await image.readAsBytes();
-      // 2. Convert to Base64 string
-      final base64Image = base64Encode(bytes);
-
-      // 3. Upload to Server
-      final avatarPath =
-          await ApiService.uploadAvatar(user.id, image.name, base64Image);
-
-      if (avatarPath != null) {
-        // 4. Update Local State
-        final updatedUser = user.copyWith(avatar: avatarPath);
-        await AuthService.updateCurrentUser(updatedUser);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Avatar updated successfully!')),
-          );
-        }
-      } else {
-        throw Exception("Upload failed");
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to upload image. Server error.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // Helper to update user fields
   Future<void> _updateProfileField({String? name}) async {
     final user = AuthService.currentUser;
     if (user == null) return;
@@ -133,12 +162,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Send Update to Server
       bool success = await ApiService.updateUser(user.id, {
         if (name != null) 'name': name,
       });
 
-      // 2. If Server accepted, update Local Storage
       if (success) {
         final updatedUser = user.copyWith(name: name);
         await AuthService.updateCurrentUser(updatedUser);
@@ -157,6 +184,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- EXPORT DATA LOGIC ---
+  Future<void> _exportAccountData() async {
+    final user = AuthService.currentUser;
+    if (user == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final data = await ApiService.exportUserData(user.id);
+      Navigator.of(context).pop(); // Dismiss loading
+
+      if (data == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to export data')));
+        return;
+      }
+
+      final jsonString = JsonEncoder.withIndent('  ').convert(data);
+      await Clipboard.setData(ClipboardData(text: jsonString));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account data copied to clipboard')),
+      );
+    } catch (e, st) {
+      Navigator.of(context).pop();
+      AppLogger.error('Export account error: $e', e, st);
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('An error occurred exporting data')));
+    }
+  }
+
+  // --- DELETE ACCOUNT LOGIC ---
+  Future<void> _confirmDeleteAccount() async {
+    final exportConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Export Data'),
+        content: const Text(
+            'Would you like to export your account data before deletion?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('No')),
+          ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Yes')),
+        ],
+      ),
+    );
+
+    if (exportConfirmed == true) {
+      await _exportAccountData();
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Account'),
+        content: const Text(
+          'This action is irreversible. Are you sure you want to permanently delete your account and all associated data?',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteAccount();
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final user = AuthService.currentUser;
+    if (user == null) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    navigator.push(DialogRoute<void>(
+      context: context,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    ));
+
+    try {
+      final success = await ApiService.deleteUser(user.id);
+      navigator.pop();
+
+      if (success) {
+        await AuthService.logout();
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(
+              content: Text('Failed to delete account. Please try again.'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } catch (e, st) {
+      navigator.pop();
+      AppLogger.error('Delete account error: $e', e, st);
+      messenger.showSnackBar(
+        const SnackBar(
+            content: Text('An error occurred. Please try again later.'),
+            backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -201,7 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
-        child: _isLoading
+        child: _isLoading && _pointsSummary.isEmpty
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -230,7 +383,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: Row(
                         children: [
-                          // Avatar with Edit Badge
                           GestureDetector(
                             onTap: _pickAndUploadAvatar,
                             child: Stack(
@@ -238,12 +390,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 CircleAvatar(
                                   radius: 40,
                                   backgroundColor: theme.colorScheme.primary,
-                                  backgroundImage: user.avatar != null &&
-                                          user.avatar!.startsWith('http')
-                                      ? NetworkImage(user.avatar!)
-                                      : null,
-                                  child: user.avatar == null ||
-                                          !user.avatar!.startsWith('http')
+                                  backgroundImage: _getAvatarImage(user.avatar),
+                                  child: _getAvatarImage(user.avatar) == null
                                       ? Text(
                                           user.name.isNotEmpty
                                               ? user.name[0].toUpperCase()
@@ -273,7 +421,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(width: 20),
-                          // Name and Email
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,7 +461,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    'Points: $_balance',
+                                    'Points: ${_pointsSummary['currentBalance'] ?? 0}',
                                     style: TextStyle(
                                         color: theme.colorScheme.primary,
                                         fontWeight: FontWeight.bold),
@@ -329,7 +476,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 32),
 
-                    // --- GENERAL SETTINGS (Restored) ---
+                    // --- STATS SECTION ---
+                    Text(
+                      'Your Stats',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            context,
+                            icon: Icons.stars,
+                            title: 'Points Earned',
+                            value: '${_pointsSummary['totalEarned'] ?? 0}',
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStatCard(
+                            context,
+                            icon: Icons.redeem,
+                            title: 'Points Redeemed',
+                            value: '${_pointsSummary['totalRedeemed'] ?? 0}',
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            context,
+                            icon: Icons.confirmation_num,
+                            title: 'Vouchers',
+                            value: '${_voucherStats['total'] ?? 0}',
+                            color: theme.colorScheme.tertiary,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStatCard(
+                            context,
+                            icon: Icons.account_balance_wallet,
+                            title: 'Current Balance',
+                            value: '${_pointsSummary['currentBalance'] ?? 0}',
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // --- GENERAL SETTINGS ---
                     Text('Settings',
                         style: theme.textTheme.titleLarge
                             ?.copyWith(fontWeight: FontWeight.bold)),
@@ -343,8 +552,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Notification settings coming soon!'),
-                          ),
+                              content:
+                                  Text('Notification settings coming soon!')),
                         );
                       },
                     ),
@@ -357,8 +566,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Privacy policy coming soon!'),
-                          ),
+                              content: Text('Privacy policy coming soon!')),
                         );
                       },
                     ),
@@ -371,8 +579,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Help & support coming soon!'),
-                          ),
+                              content: Text('Help & support coming soon!')),
                         );
                       },
                     ),
@@ -393,10 +600,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: theme.colorScheme.primary,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(
-                              Icons.nfc,
-                              color: theme.colorScheme.onPrimary,
-                            ),
+                            child: Icon(Icons.nfc,
+                                color: theme.colorScheme.onPrimary),
                           ),
                           children: [
                             const Text(
@@ -414,68 +619,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
 
-                    // Export Data (Clipboard)
                     _buildSettingsItem(
                       context,
                       icon: Icons.copy_all,
                       title: 'Export Data',
                       subtitle: 'Copy account data to clipboard',
-                      onTap: () async {
-                        final data = await ApiService.exportUserData(user.id);
-                        if (data != null) {
-                          await Clipboard.setData(
-                              ClipboardData(text: jsonEncode(data)));
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Data copied to clipboard!')),
-                            );
-                          }
-                        }
-                      },
+                      onTap: _exportAccountData,
                     ),
 
-                    // Delete Account
                     _buildSettingsItem(
                       context,
                       icon: Icons.delete_outline,
                       title: 'Delete Account',
                       subtitle: 'Permanently remove your data',
-                      onTap: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (c) => AlertDialog(
-                            title: const Text("Delete Account"),
-                            content: const Text(
-                                "This cannot be undone. Are you sure?"),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(c, false),
-                                  child: const Text("Cancel")),
-                              ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red),
-                                  onPressed: () => Navigator.pop(c, true),
-                                  child: const Text("Delete",
-                                      style: TextStyle(color: Colors.white))),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true) {
-                          final success = await ApiService.deleteUser(user.id);
-                          if (success) {
-                            await AuthService.logout();
-                            if (mounted) {
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                    builder: (_) => const LoginScreen()),
-                                (r) => false,
-                              );
-                            }
-                          }
-                        }
-                      },
+                      onTap: _confirmDeleteAccount,
                     ),
 
                     const SizedBox(height: 32),
@@ -499,6 +656,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+        ],
       ),
     );
   }
