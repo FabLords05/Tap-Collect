@@ -165,6 +165,50 @@ void main(List<String> args) async {
     }
   });
 
+  // --- NEW: AGGREGATION ROUTE ---
+  router.get('/users/<id>/balance/calculate', (req, String id) async {
+    try {
+      final pipeline = [
+        // 1. Filter: Only look at transactions for THIS user
+        {
+          '\$match': {'user_id': id}
+        },
+        // 2. Group: Sum up the 'points' field
+        {
+          '\$group': {
+            '_id': null,
+            'calculated_total': {'\$sum': '\$points'}
+          }
+        }
+      ];
+
+      // Execute Aggregation
+      final result = await transactionsCol.aggregateToStream(pipeline).toList();
+
+      // Extract Result (Default to 0 if empty)
+      int total = 0;
+      if (result.isNotEmpty && result.first['calculated_total'] != null) {
+        total = result.first['calculated_total'] as int;
+      }
+
+      // FIX: Update the user's wallet with the TRUE number
+      final objId = ObjectId.parse(id);
+      await usersCol.update(
+          where.eq('_id', objId), modify.set('points_balance', total));
+
+      print("✅ Audit complete for user $id. True Balance: $total");
+
+      return Response.ok(jsonEncode({
+        'status': 'success',
+        'true_balance': total,
+        'message': 'Wallet synced with history'
+      }));
+    } catch (e) {
+      return Response.internalServerError(
+          body: jsonEncode({'error': e.toString()}));
+    }
+  });
+
   router.patch('/users/<id>', (req, String id) async {
     try {
       final body = await req.readAsString();
@@ -181,7 +225,7 @@ void main(List<String> args) async {
       if (data.containsKey('name')) updateData['name'] = data['name'];
       if (data.containsKey('avatar')) updateData['avatar'] = data['avatar'];
 
-      // FIX: Use raw $set map instead of modify.setAll (which doesn't exist)
+      // FIX: Use raw $set map
       await usersCol.updateOne(where.eq('_id', objId), {r'$set': updateData});
 
       return Response.ok(jsonEncode({'status': 'updated'}));
@@ -191,106 +235,43 @@ void main(List<String> args) async {
   });
 
   // --- TRANSACTIONS (Points Logic) ---
-  // Create transaction (replace existing /transactions handler)
   router.post('/transactions', (req) async {
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    if (data['user_id'] == null ||
-        data['business_id'] == null ||
-        data['type'] == null) {
+    if (data['user_id'] == null || data['points'] == null) {
       return Response(400,
-          body: jsonEncode({'error': 'user_id, business_id, type required'}));
+          body: jsonEncode({'error': 'user_id and points required'}));
     }
 
-    final String userIdStr = data['user_id'] as String;
-    final String businessId = data['business_id'] as String;
-    final String type = (data['type'] as String).toUpperCase();
-
-    // compute points: prefer explicit 'points', else use amount_spent * business.points_per_dollar, else 1
-    int points = 0;
-    if (data.containsKey('points')) {
-      points = (data['points'] is num)
-          ? (data['points'] as num).toInt()
-          : int.tryParse('${data['points']}') ?? 0;
-    } else if (data.containsKey('amount_spent')) {
-      final amt = double.tryParse('${data['amount_spent']}') ?? 0.0;
-      final biz = await businessesCol.findOne(
-          where.eq('_id', ObjectId.tryParse(businessId) ?? businessId));
-      final ppd = (biz != null && biz['points_per_dollar'] != null)
-          ? (double.tryParse('${biz['points_per_dollar']}') ?? 1.0)
-          : 1.0;
-      points = (amt * ppd).floor();
-    } else {
-      // default fallback if no amount/points: award 1 point per tap
-      points = 1;
-    }
-
-    if (points < 0) {
-      return Response(400, body: jsonEncode({'error': 'points must be >= 0'}));
-    }
-
+    final String userIdStr = data['user_id'];
+    final int points = data['points'];
     final now = DateTime.now().toIso8601String();
+
     final doc = {
       'user_id': userIdStr,
-      'business_id': businessId,
-      'type': type,
+      'business_id': data['business_id'] ?? 'unknown',
+      'type': data['type'] ?? 'EARN',
       'points': points,
-      'description': data['description'] ?? 'Tap NFC',
+      'description': data['description'] ?? 'Points Activity',
       'reward_id': data['reward_id'],
       'created_at': now,
     };
 
-    // Insert transaction first (so we keep a record even if balance update fails)
     await transactionsCol.insertOne(doc);
-    print("✅ Transaction saved: $points points");
 
-    // Try to update user's balance atomically
+    // Update wallet balance
     try {
-      // resolve ObjectId if possible
-      final userObjId = ObjectId.tryParse(userIdStr);
-      final selector = userObjId != null
-          ? where.eq('_id', userObjId)
-          : where.eq('_id', userIdStr);
-
-      if (type == 'REDEEM') {
-        // ensure balance won't go negative: use findOneAndUpdate-like pattern if driver supports it,
-        // otherwise check then update (best-effort)
-        final userDoc = await usersCol.findOne(selector);
-        if (userDoc == null) {
-          return Response(404, body: jsonEncode({'error': 'user not found'}));
-        }
-        final current = (userDoc['points_balance'] is num)
-            ? (userDoc['points_balance'] as num).toInt()
-            : 0;
-        if (current < points) {
-          return Response(400,
-              body: jsonEncode(
-                  {'error': 'insufficient points', 'balance': current}));
-        }
-      }
-
-      // atomic increment (works for EARN and REDEEM if REDEEM uses negative points)
-      final incValue = (type == 'REDEEM') ? -points : points;
-      await usersCol.updateOne(
-          selector, modify.inc('points_balance', incValue));
-
-      // return the updated balance
-      final updatedUser = await usersCol.findOne(selector);
-      final newBalance =
-          (updatedUser != null && updatedUser['points_balance'] != null)
-              ? updatedUser['points_balance']
-              : 0;
-      final result = Map<String, dynamic>.from(doc);
-      result['id'] = _idFromInsertResult(null, doc) ?? '';
-      result['new_balance'] = newBalance;
-      return Response(201, body: jsonEncode(result));
+      final userObjectId = ObjectId.parse(userIdStr);
+      await usersCol.update(
+          where.eq('_id', userObjectId), modify.inc('points_balance', points));
+      print("✅ Updated balance for user $userIdStr by $points points");
     } catch (e) {
-      // log and return error but transaction record stays for audit
-      stderr.writeln('Error updating points balance: $e');
-      return Response(500,
-          body: jsonEncode({'error': 'failed to update balance'}));
+      print("❌ Error updating user balance: $e");
     }
+
+    return Response(201,
+        body: jsonEncode({'status': 'success', 'points_added': points}));
   });
 
   router.get('/users/<user_id>/transactions', (req, String userId) async {
@@ -491,7 +472,7 @@ void main(List<String> args) async {
       if (data['redeemed_at'] != null)
         updateMap['redeemed_at'] = data['redeemed_at'];
 
-      // FIX: Use raw $set map instead of modify.setAll
+      // FIX: Use raw $set map
       await vouchersCol.updateOne(where.eq('_id', objId), {r'$set': updateMap});
       final updated = await vouchersCol.findOne(where.eq('_id', objId));
 
