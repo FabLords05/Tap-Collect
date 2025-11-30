@@ -28,24 +28,50 @@ class MerchantAuthService {
       }
     }
 
-    // Seed a demo merchant if none exists
+    // Seed demo merchants if none exists (create several for testing)
     final merchantsList = await StorageService.loadList(_merchantsKey);
     if (merchantsList.isEmpty) {
       final now = DateTime.now();
-      final demo = Merchant(
-        id: _uuid.v4(),
-        email: 'merchant@grovecafe.com',
-        name: 'Grove Café Admin',
-        businessId: 'sample-cafe-001',
-        createdAt: now,
-        updatedAt: now,
-      );
-      await StorageService.saveList(_merchantsKey, [demo.toJson()]);
 
-      // Seed credentials: email -> password
-      await StorageService.saveData(_merchantCredsKey, {
+      final demoMerchants = [
+        Merchant(
+          id: _uuid.v4(),
+          email: 'merchant@grovecafe.com',
+          name: 'Grove Café Admin',
+          businessId: 'sample-cafe-001',
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Merchant(
+          id: _uuid.v4(),
+          email: 'merchant@cornerbistro.com',
+          name: 'Corner Bistro Admin',
+          businessId: 'corner-bistro-002',
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Merchant(
+          id: _uuid.v4(),
+          email: 'merchant@greenmarket.com',
+          name: 'Green Market Admin',
+          businessId: 'green-market-003',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+
+      await StorageService.saveList(
+        _merchantsKey,
+        demoMerchants.map((m) => m.toJson()).toList(),
+      );
+
+      // Seed credentials: email -> password (lowercase keys)
+      final creds = {
         'merchant@grovecafe.com': '123456',
-      });
+        'merchant@cornerbistro.com': 'corner123',
+        'merchant@greenmarket.com': 'green123',
+      };
+      await StorageService.saveData(_merchantCredsKey, creds);
     }
   }
 
@@ -76,9 +102,49 @@ class MerchantAuthService {
     return null;
   }
 
+  /// Set current merchant from a server response map and persist session
+  static Future<Merchant?> setCurrentMerchantFromMap(
+      Map<String, dynamic> data) async {
+    try {
+      final merchant = Merchant.fromJson(data);
+      _currentMerchant = merchant;
+      await StorageService.saveData(_currentMerchantKey, merchant.toJson());
+      return merchant;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> logout() async {
     _currentMerchant = null;
     // Clear session
     await StorageService.saveData(_currentMerchantKey, {});
+  }
+
+  // Step 1: Add new merchant to local storage
+  static Future<void> addMerchant({
+    required String email,
+    required String name,
+    required String businessId,
+    required String password,
+  }) async {
+    final merchants = await StorageService.loadList(_merchantsKey);
+
+    final newMerchant = Merchant(
+      id: _uuid.v4(),
+      email: email,
+      name: name,
+      businessId: businessId,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    merchants.add(newMerchant.toJson());
+    await StorageService.saveList(_merchantsKey, merchants);
+
+    // Step 2: Store credentials
+    final creds = await StorageService.loadData(_merchantCredsKey) ?? {};
+    creds[email.toLowerCase()] = password;
+    await StorageService.saveData(_merchantCredsKey, creds);
   }
 }

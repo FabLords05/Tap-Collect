@@ -334,6 +334,33 @@ void main(List<String> args) async {
   });
 
   // --- MERCHANT ROUTES ---
+
+  // --- MERCHANT AUTH: LOGIN ---
+  router.post('/merchants/login', (req) async {
+    final body = await req.readAsString();
+    final data = jsonDecode(body) as Map<String, dynamic>;
+
+    if (data['email'] == null || data['password'] == null) {
+      return Response(400,
+          body: jsonEncode({'error': 'email and password required'}));
+    }
+
+    final email = _normalizeEmail(data['email'] as String?);
+
+    // 1. Check MERCHANTS collection (expects a 'password' field if using server-side creds)
+    final merchant = await merchantsCol.findOne(where.eq('email', email));
+
+    if (merchant == null || merchant['password'] != data['password']) {
+      return Response(401,
+          body: jsonEncode({'error': 'Invalid merchant credentials'}));
+    }
+
+    final result = _mapDoc(merchant);
+    // Remove password before returning
+    result.remove('password');
+    return Response.ok(jsonEncode(result));
+  });
+
   router.post('/merchants', (req) async {
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;

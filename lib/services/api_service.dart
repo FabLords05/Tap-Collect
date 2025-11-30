@@ -100,6 +100,26 @@ class ApiService {
     }
   }
 
+  // 4b. Merchant Login (server-side)
+  static Future<Map<String, dynamic>?> loginMerchant(
+      String email, String password) async {
+    final url = Uri.parse('$baseUrl/merchants/login');
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "password": password}),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print('Merchant Login Error: $e');
+      return null;
+    }
+  }
+
   // 5. Earn Points
   static Future<bool> earnPoints({
     required String userId,
