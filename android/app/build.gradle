@@ -58,3 +58,11 @@ android {
 flutter {
     source = "../.."
 }
+
+configurations.all {
+    resolutionStrategy {
+        // Force the older stable version that works with Android API 34
+        force 'androidx.activity:activity:1.9.3'
+        force 'androidx.activity:activity-ktx:1.9.3'
+    }
+}

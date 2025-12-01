@@ -19,19 +19,6 @@ Future<void> main() async {
   // --- NEW: HARDWARE DETECTION LOGIC ---
   // 1. Check if we already have a mode saved
   String? currentMode = await StorageService.getAppMode();
-
-  // 2. If NO mode is saved (First install), detect hardware
-  if (currentMode == null) {
-    bool isNfcAvailable = await NfcManager.instance.isAvailable();
-
-    if (isNfcAvailable) {
-      print("📱 NFC Detected: Defaulting to TAP MODE");
-      await StorageService.saveAppMode('tap');
-    } else {
-      print("📷 No NFC Detected: Defaulting to QR MODE");
-      await StorageService.saveAppMode('qr');
-    }
-  }
   // -------------------------------------
 
   // Migrate any global points balance into the current user's storage (one-time)
