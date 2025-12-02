@@ -52,7 +52,15 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.release
+            // Use real release keystore if configured, otherwise fallback to debug keystore for local testing
+            if (signingConfigs.release?.storeFile != null) {
+                signingConfig signingConfigs.release
+            } else {
+                // Fallback prevents the "storeFile missing" error during local builds
+                signingConfig signingConfigs.debug
+            }
+
+            // ...existing code...
         }
     }
 }
