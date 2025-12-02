@@ -14,7 +14,14 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.mycompany.CounterApp"
-    compileSdk = 34
+    
+    // CHANGE 1: Match the platform you downloaded (android-33)
+    // If you only downloaded Platform 33, this must be 33. If 34, leave as 34.
+    compileSdk = 33
+
+    // CHANGE 2: Force it to use the folder you verified (E:\Android\build-tools\34.0.0)
+    buildToolsVersion = "34.0.0"
+
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -36,10 +43,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.mycompany.CounterApp"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -48,8 +52,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.release
         }
     }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nfc_manager/nfc_manager.dart'; // Import NFC Manager
+// Import NFC Manager
 import 'package:grove_rewards/theme.dart';
 import 'package:grove_rewards/services/auth_service.dart';
 import 'package:grove_rewards/services/merchant_auth_service.dart';
@@ -164,7 +164,7 @@ class TransactionService {
   // Use emulator host for Android emulator; replace when deploying or testing on device
   static const _serverBase = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://10.0.2.2:8080',
+    defaultValue: 'https://your-app.render.com',
   );
 
   /// Send a transaction and update local stored balance on success.

@@ -324,8 +324,9 @@ void main(List<String> args) async {
     try {
       final objId = ObjectId.parse(id);
       final doc = await businessesCol.findOne(where.eq('_id', objId));
-      if (doc == null)
+      if (doc == null) {
         return Response.notFound(jsonEncode({'error': 'not found'}));
+      }
       final result = _mapDoc(doc);
       return Response.ok(jsonEncode(result));
     } catch (e) {
@@ -496,15 +497,17 @@ void main(List<String> args) async {
 
       final updateMap = {'updated_at': now};
       if (data['status'] != null) updateMap['status'] = data['status'];
-      if (data['redeemed_at'] != null)
+      if (data['redeemed_at'] != null) {
         updateMap['redeemed_at'] = data['redeemed_at'];
+      }
 
       // FIX: Use raw $set map
       await vouchersCol.updateOne(where.eq('_id', objId), {r'$set': updateMap});
       final updated = await vouchersCol.findOne(where.eq('_id', objId));
 
-      if (updated == null)
+      if (updated == null) {
         return Response.notFound(jsonEncode({'error': 'not found'}));
+      }
       final result = _mapDoc(updated);
       return Response.ok(jsonEncode(result));
     } catch (e) {
