@@ -180,8 +180,8 @@ class TransactionService {
   // Use emulator host for Android emulator; replace when deploying or testing on device
   static const _serverBase = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://localhost:8080',
-    // defaultValue: 'https://your-app.render.com',
+    // defaultValue: 'http://localhost:8080',
+    defaultValue: 'https://tap-collect.onrender.com',
   );
 
   /// Send a transaction and update local stored balance on success.

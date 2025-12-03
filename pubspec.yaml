@@ -12,7 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_fonts: ^6.1.0
   nfc_manager: ^3.0.0
-  permission_handler: ^10.4.0
+  permission_handler: ^11.3.1  # Or newer version
   shared_preferences: ^2.2.2
   go_router: ^17.0.0
   uuid: ^4.0.0

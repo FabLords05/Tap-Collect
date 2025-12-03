@@ -91,6 +91,77 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen>
   }
 }
 
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int value;
+  final Color color;
+  const _StatCard(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(height: 6),
+            Text(label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+            Text('$value',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+  const _MiniStat(
+      {required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.onPrimaryContainer),
+          const SizedBox(width: 8),
+          Text('$label: $value',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onPrimaryContainer)),
+        ],
+      ),
+    );
+  }
+}
+
 class _OverviewTab extends StatefulWidget {
   final String businessId;
   final Function(int) onSwitchTab;
