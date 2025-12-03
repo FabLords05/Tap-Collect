@@ -83,16 +83,42 @@ class _MerchantScanScreenState extends State<MerchantScanScreen> {
       setState(() => _isNfcListening = true);
     }
 
-    NfcManager.instance.startSession(
-      onDiscovered: (NfcTag tag) async {
-        if (_hasFoundUser) return;
-        
-        // Simple simulation: if any tag is found, use a placeholder ID
-        // In production, read NDEF payload here
-        // String userId = "EXTRACTED_ID";
-        // _handleUserFound(userId);
-      },
-    );
+    try {
+      NfcManager.instance.startSession(
+       pollingOptions: {},
+         onDiscovered: (NfcTag tag) async {
+           if (_hasFoundUser) return;
+           
+           // Extract userId from tag (NDEF or ID)
+           try {
+             final ndef = Ndef.from(tag);
+             if (ndef != null && ndef.cachedMessage != null) {
+               for (final record in ndef.cachedMessage!.records) {
+                 final payload = String.fromCharCodes(record.payload);
+                 if (payload.isNotEmpty) {
+                   _handleUserFound(payload);
+                   return;
+                 }
+               }
+             }
+           } catch (_) {}
+           
+           // Fallback: use tag ID as userId
+           final tagId = tag.data['id'];
+           if (tagId != null && tagId is List) {
+             final hex = tagId.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+             if (hex.isNotEmpty) {
+               _handleUserFound(hex);
+             }
+           }
+         },
+       );
+    } catch (e) {
+      print('NFC start error: $e');
+      if (mounted) {
+        setState(() => _isNfcListening = false);
+      }
+    }
   }
 
   // --- SUCCESS HANDLER ---
