@@ -41,18 +41,22 @@ class _MerchantScanScreenState extends State<MerchantScanScreen> {
     final status = await Permission.camera.request();
     
     if (status.isGranted) {
-      if (mounted) {
-        setState(() => _isScanning = true);
-      }
       try {
         await _cameraController.start();
+        if (mounted) {
+          setState(() => _isScanning = true);
+        }
       } catch (e) {
-        print("Camera Error: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Camera error: $e')),
+          );
+        }
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Camera permission needed for QR scanning")),
+          const SnackBar(content: Text('Camera permission denied')),
         );
       }
     }
