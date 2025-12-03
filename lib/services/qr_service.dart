@@ -73,7 +73,9 @@ class QRService {
         ),
       );
 
-      await controller.dispose();
+      // FIX: Removed 'await' here because dispose() is void
+      controller.dispose(); 
+      
       return scannedData;
     } catch (e) {
       debugPrint('QR Scan error: $e');

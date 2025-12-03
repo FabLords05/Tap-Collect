@@ -7,6 +7,9 @@ import 'package:grove_rewards/services/local_database.dart';
 import 'package:grove_rewards/services/storage_service.dart'; // Import Storage
 import 'package:grove_rewards/screens/auth/login_screen.dart';
 import 'package:grove_rewards/screens/home/home_screen.dart';
+import 'package:grove_rewards/screens/home/customer_identity_screen.dart';
+import 'package:grove_rewards/screens/merchant/merchant_scan_screen.dart';
+import 'package:grove_rewards/screens/merchant/merchant_point_entry_screen.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -75,6 +78,19 @@ class MyApp extends StatelessWidget {
       home: AuthService.isLoggedIn
           ? NfcTapHandler(key: nfcTapKey, child: const HomeScreen())
           : const LoginScreen(),
+      routes: {
+        '/customerIdentity': (_) => const CustomerIdentityScreen(),
+        '/merchantScan': (_) => const MerchantScanScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/merchantPointEntry' && settings.arguments is String) {
+          final userId = settings.arguments as String;
+          return MaterialPageRoute(
+            builder: (_) => MerchantPointEntryScreen(userId: userId),
+          );
+        }
+        return null;
+      },
       builder: (context, child) {
         if (migratedPoints && !_migrationShown) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
