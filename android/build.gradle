@@ -1,24 +1,21 @@
+// 1. Define plugins and versions at the very top (The "New Way")
+
 buildscript {
     ext {
-        kotlin_version = '1.9.0'
+        kotlin_version = '1.8.22'
     }
-}
-
-plugins {
-    id "com.android.application" version "8.6.0" apply false
-    id "com.android.library" version "8.6.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.9.0" apply false
-}
-
-buildscript {
     repositories {
         google()
         mavenCentral()
     }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22'
-    }
+    // 2. REMOVED the 'dependencies' block here to stop the conflict.
+}
+
+plugins {
+    id "com.android.application" version "8.2.1" apply false
+    id "com.android.library" version "8.2.1" apply false
+    // I updated this to 1.8.22 to match your ext variable intent
+    id "org.jetbrains.kotlin.android" version "1.8.22" apply false
 }
 
 allprojects {
@@ -29,7 +26,10 @@ allprojects {
 }
 
 rootProject.buildDir = "../build"
+
 subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    
     afterEvaluate { project ->
         if (project.hasProperty("kotlin")) {
             project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
@@ -38,34 +38,16 @@ subprojects {
                 }
             }
         }
-    }
-} 
- 
-subprojects {
-    afterEvaluate { project ->
         if (project.plugins.hasPlugin("com.android.application") ||
                 project.plugins.hasPlugin("com.android.library")) {
             project.android {
                 compileSdkVersion 34
-            }
-        }
-        }
-        if (project.hasProperty('android')) {
-            project.android {
                 if (namespace == null) {
                     namespace project.group
                 }
             }
         }
-
-}
-
-subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-
-subprojects {
-    project.evaluationDependsOn(":app")
+    }
 }
 
 tasks.register("clean", Delete) {

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:grove_rewards/theme.dart';
 import 'package:grove_rewards/services/auth_service.dart';
 import 'package:grove_rewards/services/merchant_auth_service.dart';
-import 'package:grove_rewards/services/local_database.dart';
 import 'package:grove_rewards/services/storage_service.dart'; // Import Storage
 import 'package:grove_rewards/screens/auth/login_screen.dart';
 import 'package:grove_rewards/screens/home/home_screen.dart';
@@ -39,18 +38,6 @@ Future<void> main() async {
     }
   } catch (_) {
     // Ignore migration errors — proceed with app startup
-  }
-  // Initialize local database (best-effort; don't block startup on failure)
-  try {
-    await LocalDatabase.instance.database;
-    // optional: insert a sample business for quick testing (no-op if exists)
-    await LocalDatabase.instance.upsertBusiness({
-      'id': 'sample-biz',
-      'name': 'Sample Business',
-      'meta': '{}',
-    });
-  } catch (_) {
-    // Silently ignore DB init errors so the app can still run
   }
 
   runApp(MyApp(migratedPoints: migratedPoints));

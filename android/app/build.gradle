@@ -17,7 +17,7 @@ android {
     
     // CHANGE 1: Match the platform you downloaded (android-33)
     // If you only downloaded Platform 33, this must be 33. If 34, leave as 34.
-    compileSdk = 35
+    compileSdk = 34
 
     // CHANGE 2: Force it to use the folder you verified (E:\Android\build-tools\34.0.0)
     buildToolsVersion = "34.0.0"
