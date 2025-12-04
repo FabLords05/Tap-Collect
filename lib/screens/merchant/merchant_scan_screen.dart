@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:grove_rewards/screens/merchant/merchant_point_entry_screen.dart';
 
 class MerchantScanScreen extends StatefulWidget {
@@ -21,7 +22,12 @@ class _MerchantScanScreenState extends State<MerchantScanScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeScanners();
+    // Delay initialization until after first frame so the MobileScanner
+    // widget is mounted before we call controller.start(). This avoids
+    // race conditions on some platforms (especially web).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeScanners();
+    });
   }
 
   @override
@@ -38,8 +44,25 @@ class _MerchantScanScreenState extends State<MerchantScanScreen> {
 
   // --- QR CAMERA LOGIC ---
   Future<void> _startCamera() async {
+    // On web the browser handles camera permissions via getUserMedia.
+    // The `permission_handler` package may not behave as expected on web,
+    // so skip requesting permissions there and try to start the camera.
+    if (kIsWeb) {
+      try {
+        await _cameraController.start();
+        if (mounted) setState(() => _isScanning = true);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Camera error (web): $e')),
+          );
+        }
+      }
+      return;
+    }
+
     final status = await Permission.camera.request();
-    
+
     if (status.isGranted) {
       try {
         await _cameraController.start();
