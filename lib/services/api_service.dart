@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:grove_rewards/services/app_logger.dart';
+import 'package:grove_rewards/models/user.dart';
+import 'package:grove_rewards/services/storage_service.dart';
 
 // Helper functions for normalization
 String _titleCase(String? input) {
@@ -144,6 +146,10 @@ class ApiService {
         print("✅ Points Saved: ${response.body}");
         return true;
       }
+      // Log failure for debugging
+      try {
+        print('❌ EarnPoints failed: status=${response.statusCode}, body=${response.body}');
+      } catch (_) {}
       return false;
     } catch (e) {
       print("❌ Error saving points: $e");
@@ -177,6 +183,29 @@ class ApiService {
     } catch (e, st) {
       try {
         AppLogger.error('Export user data error: $e', e, st);
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  // Get user data from backend
+  static Future<User?> getUser(String userId) async {
+    final url = Uri.parse('$baseUrl/users/$userId');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+          final body = jsonDecode(response.body) as Map<String, dynamic>;
+          final user = User.fromJson(body);
+          // Persist server-provided balance locally (per-user)
+          try {
+            await StorageService.savePointsBalanceForUser(user.id, user.pointsBalance);
+          } catch (_) {}
+          return user;
+      }
+      return null;
+    } catch (e, st) {
+      try {
+        AppLogger.error('Get user error: $e', e, st);
       } catch (_) {}
       return null;
     }

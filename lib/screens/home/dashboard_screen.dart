@@ -38,6 +38,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _currentBusinessId = 'sample-biz';
+    // Quickly load the cached balance so the UI shows the user's points
+    // as soon as possible while the full dashboard refresh runs.
+    PointsService.getBalance().then((balance) {
+      if (mounted) {
+        setState(() {
+          _pointsBalance = balance;
+        });
+      }
+    });
     _loadDashboardData();
     _initializeNFC();
     _checkBusinessActivation();
@@ -61,6 +70,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     try {
+      final user = AuthService.currentUser;
+      
+      // Fetch fresh data from backend (MongoDB)
+      if (user != null) {
+        final userFromBackend = await ApiService.getUser(user.id);
+        if (userFromBackend != null) {
+          // Update local storage with backend data
+          await AuthService.updateCurrentUser(userFromBackend);
+        }
+      }
+      
+      // Now load balance and transactions from storage
       final balance = await PointsService.getBalance();
       final transactions = await TransactionService.getRecentTransactions(5);
 

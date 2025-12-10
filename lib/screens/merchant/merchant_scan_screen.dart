@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:grove_rewards/widgets/scanner_widget.dart';
 import 'package:grove_rewards/screens/merchant/merchant_point_entry_screen.dart';
 
 class MerchantScanScreen extends StatefulWidget {
@@ -13,85 +12,37 @@ class MerchantScanScreen extends StatefulWidget {
 }
 
 class _MerchantScanScreenState extends State<MerchantScanScreen> {
-  final MobileScannerController _cameraController = MobileScannerController();
-  
-  bool _isScanning = false;
   bool _isNfcListening = false;
   bool _hasFoundUser = false;
 
   @override
   void initState() {
     super.initState();
-    // Delay initialization until after first frame so the MobileScanner
-    // widget is mounted before we call controller.start(). This avoids
-    // race conditions on some platforms (especially web).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeScanners();
-    });
+    _startNfc(); // Start NFC immediately, camera handled by ScannerWidget
   }
 
   @override
   void dispose() {
-    _cameraController.dispose(); // void, do not await
+    // ScannerWidget disposes its controller automatically.
     NfcManager.instance.stopSession(); // Future, but fine to fire-and-forget here
     super.dispose();
   }
 
   Future<void> _initializeScanners() async {
-    await _startCamera();
+    // Camera is handled by dedicated ScannerWidget. We just enable scanning UI.
     await _startNfc();
   }
-
-  // --- QR CAMERA LOGIC ---
-  Future<void> _startCamera() async {
-    // On web the browser handles camera permissions via getUserMedia.
-    // The `permission_handler` package may not behave as expected on web,
-    // so skip requesting permissions there and try to start the camera.
-    if (kIsWeb) {
-      try {
-        await _cameraController.start();
-        if (mounted) setState(() => _isScanning = true);
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Camera error (web): $e')),
-          );
-        }
-      }
-      return;
-    }
-
-    final status = await Permission.camera.request();
-
-    if (status.isGranted) {
-      try {
-        await _cameraController.start();
-        if (mounted) {
-          setState(() => _isScanning = true);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Camera error: $e')),
-          );
-        }
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Camera permission denied')),
-        );
-      }
-    }
-  }
+  // Camera logic is implemented inside `ScannerWidget`.
 
   void _onQrDetected(BarcodeCapture capture) {
     if (_hasFoundUser) return;
 
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
-      if (barcode.rawValue != null) {
-        _handleUserFound(barcode.rawValue!);
+      final value = barcode.rawValue ?? barcode.displayValue;
+      debugPrint('QR detected value: $value, format: ${barcode.format}');
+      if (value != null && value.isNotEmpty) {
+        _handleUserFound(value);
         break;
       }
     }
@@ -151,12 +102,10 @@ class _MerchantScanScreenState extends State<MerchantScanScreen> {
 
     setState(() {
       _hasFoundUser = true;
-      _isScanning = false;
     });
 
     // Stop hardware
     try {
-      await _cameraController.stop();
       await NfcManager.instance.stopSession();
     } catch (e) {
       print("Error stopping scanners: $e");
@@ -179,13 +128,10 @@ class _MerchantScanScreenState extends State<MerchantScanScreen> {
       appBar: AppBar(title: const Text("Scan Customer")),
       body: Stack(
         children: [
-          if (_isScanning)
-            MobileScanner(
-              controller: _cameraController,
-              onDetect: _onQrDetected,
-            )
-          else
-            const Center(child: Text("Initializing Camera...")),
+          // ScannerWidget handles its own initialization with FutureBuilder
+          ScannerWidget(
+            onDetect: _onQrDetected,
+          ),
 
           SafeArea(
             child: Column(

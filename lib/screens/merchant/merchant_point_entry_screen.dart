@@ -21,7 +21,7 @@ class _MerchantPointEntryScreenState extends State<MerchantPointEntryScreen> {
   
   // Default rate (1 currency unit = 10 points)
   // In a real app, this comes from the database
-  double _pointsPerCurrency = 10.0; 
+  double _pointsRate = 10.0; 
   
   int _calculatedPoints = 0;
   bool _isLoading = false;
@@ -31,6 +31,7 @@ class _MerchantPointEntryScreenState extends State<MerchantPointEntryScreen> {
   void initState() {
     super.initState();
     _loadMerchantData();
+    debugPrint('MerchantPointEntryScreen created for userId=${widget.userId}');
     // Listen to typing changes to update points in real-time
     _amountController.addListener(_calculatePoints);
   }
@@ -51,14 +52,14 @@ class _MerchantPointEntryScreenState extends State<MerchantPointEntryScreen> {
         setState(() {
           _merchantBusinessId = merchant.businessId;
           // If merchant has a specific rate, use it, otherwise default to 10
-          _pointsPerCurrency = merchant.pointsPerCurrency?.toDouble() ?? 10.0;
+          _pointsRate = merchant.pointsRate?.toDouble() ?? 10.0;
         });
       } else {
         // Fallback for testing (if logged in as a regular user debugging this screen)
-        setState(() {
-           _pointsPerCurrency = AuthService.currentUser?.pointsPerCurrency?.toDouble() ?? 10.0;
-           _merchantBusinessId = 'sample-biz'; // Fallback ID
-        });
+          setState(() {
+            _pointsRate = AuthService.currentUser?.pointsRate?.toDouble() ?? 10.0;
+            _merchantBusinessId = 'sample-biz'; // Fallback ID
+          });
       }
       
       // Recalculate in case text was already entered
@@ -80,9 +81,9 @@ class _MerchantPointEntryScreenState extends State<MerchantPointEntryScreen> {
 
     double amount = double.tryParse(cleanText) ?? 0.0;
     
-    setState(() {
+      setState(() {
       // Formula: Amount Spent * Rate = Points
-      _calculatedPoints = (amount * _pointsPerCurrency).round();
+      _calculatedPoints = (amount * _pointsRate).round();
     });
   }
 
@@ -247,7 +248,7 @@ class _MerchantPointEntryScreenState extends State<MerchantPointEntryScreen> {
                           style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)),
                         ),
                         Text(
-                          'x${_pointsPerCurrency.toInt()}', // e.g. "x10"
+                          'x${_pointsRate.toInt()}', // e.g. "x10"
                           style: TextStyle(
                             fontWeight: FontWeight.bold, 
                             color: theme.colorScheme.primary

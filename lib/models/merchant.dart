@@ -6,7 +6,7 @@ class Merchant {
   final DateTime createdAt;
   final DateTime updatedAt;
   // NEW: Field to store the merchant's specific rate
-  final double? pointsPerCurrency;
+  final double? pointsRate;
 
   const Merchant({
     required this.id,
@@ -15,7 +15,7 @@ class Merchant {
     required this.businessId,
     required this.createdAt,
     required this.updatedAt,
-    this.pointsPerCurrency,
+    this.pointsRate,
   });
 
   Map<String, dynamic> toJson() {
@@ -24,7 +24,7 @@ class Merchant {
       'email': email,
       'name': name,
       'business_id': businessId,
-      'points_per_currency': pointsPerCurrency, // Save to DB
+      'points_per_unit': pointsRate, // Save to DB (new key)
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -42,8 +42,8 @@ class Merchant {
       email: json['email'] as String,
       name: json['name'] as String,
       businessId: json['business_id'] as String,
-      // Parse double safely
-      pointsPerCurrency: (json['points_per_currency'] as num?)?.toDouble(),
+      // Parse new key
+      pointsRate: (json['points_per_unit'] as num?)?.toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -56,7 +56,7 @@ class Merchant {
     String? businessId,
     DateTime? createdAt,
     DateTime? updatedAt,
-    double? pointsPerCurrency,
+    double? pointsRate,
   }) {
     return Merchant(
       id: id ?? this.id,
@@ -65,7 +65,7 @@ class Merchant {
       businessId: businessId ?? this.businessId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      pointsPerCurrency: pointsPerCurrency ?? this.pointsPerCurrency,
+      pointsRate: pointsRate ?? this.pointsRate,
     );
   }
 }

@@ -10,6 +10,14 @@ class QRService {
 
       if (!context.mounted) return null;
 
+      // Try to start the camera before showing the scanner UI so the
+      // controller is attached and ready when the widget builds.
+      try {
+        await controller.start();
+      } catch (e) {
+        debugPrint('Camera start error: $e');
+      }
+
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -73,8 +81,7 @@ class QRService {
         ),
       );
 
-      // FIX: Removed 'await' here because dispose() is void
-      controller.dispose(); 
+      controller.dispose();
       
       return scannedData;
     } catch (e) {

@@ -7,7 +7,8 @@ class User {
   final DateTime createdAt;
   final DateTime updatedAt;
   // NEW: Field to store custom point rate if applicable
-  final double? pointsPerCurrency;
+  final double? pointsRate;
+  final int pointsBalance;
 
   const User({
     required this.id,
@@ -17,7 +18,8 @@ class User {
     this.activatedBusinessIds = const [],
     required this.createdAt,
     required this.updatedAt,
-    this.pointsPerCurrency,
+    this.pointsRate,
+    this.pointsBalance = 0,
   });
 
   Map<String, dynamic> toJson() {
@@ -27,7 +29,8 @@ class User {
       'name': name,
       'avatar': avatar,
       'activated_business_ids': activatedBusinessIds,
-      'points_per_currency': pointsPerCurrency, // Save to DB
+      'points_balance': pointsBalance,
+      'points_per_unit': pointsRate, // Save to DB (new key)
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -48,8 +51,9 @@ class User {
       activatedBusinessIds: List<String>.from(
         json['activated_business_ids'] as List<dynamic>? ?? [],
       ),
-      // Parse double safely (handles int or double from DB)
-      pointsPerCurrency: (json['points_per_currency'] as num?)?.toDouble(),
+      // Parse new keys
+      pointsBalance: (json['points_balance'] as num?)?.toInt() ?? 0,
+      pointsRate: (json['points_per_unit'] as num?)?.toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -61,9 +65,10 @@ class User {
     String? name,
     String? avatar,
     List<String>? activatedBusinessIds,
+    double? pointsRate,
     DateTime? createdAt,
     DateTime? updatedAt,
-    double? pointsPerCurrency,
+    int? pointsBalance,
   }) {
     return User(
       id: id ?? this.id,
@@ -73,7 +78,8 @@ class User {
       activatedBusinessIds: activatedBusinessIds ?? this.activatedBusinessIds,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      pointsPerCurrency: pointsPerCurrency ?? this.pointsPerCurrency,
+      pointsRate: pointsRate ?? this.pointsRate,
+      pointsBalance: pointsBalance ?? this.pointsBalance,
     );
   }
 }
