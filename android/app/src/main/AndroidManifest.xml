@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest package="com.mycompany.CounterApp" xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- NFC permissions for business activation scanning -->
     <uses-permission android:name="android.permission.NFC" />
     <!-- Camera permission for QR code scanning -->
@@ -9,22 +9,19 @@
     <!-- Internet for API communication -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Permissions -->
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-permission android:name="android.permission.NFC"/>
 
     <!-- Optional features so devices without NFC/camera can still install -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.nfc" android:required="false"/>
 
     <application
-        android:label="Tap&Collect"
+        android:label="Tap&amp;Collect"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"

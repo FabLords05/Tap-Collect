@@ -15,22 +15,21 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.mycompany.CounterApp"
     
-    // CHANGE 1: Match the platform you downloaded (android-33)
-    // If you only downloaded Platform 33, this must be 33. If 34, leave as 34.
-    compileSdk = 34
+    // Updated to match camera dependency requirements: compile against Android 35
+    compileSdk = 35
 
-    // CHANGE 2: Force it to use the folder you verified (E:\Android\build-tools\34.0.0)
-    buildToolsVersion = "34.0.0"
+    // Ensure build-tools for API 35 are used if available
+    buildToolsVersion = "35.0.0"
 
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = "17"
     }
 
     signingConfigs {
