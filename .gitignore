@@ -98,3 +98,8 @@ flutter_launcher_icons/
 
 # OneDrive temp files
 ~$*
+
+# Windows generated files
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugins.cmake
+windows/flutter/ephemeral/
