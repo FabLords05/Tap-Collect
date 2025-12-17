@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Needed for Keyboard detection
-import 'package:grove_rewards/services/auth_service.dart';
+import 'package:grove_rewards/services/api_service.dart';
 import 'package:grove_rewards/services/rewards_service.dart';
 import 'package:grove_rewards/services/business_service.dart';
 import 'package:grove_rewards/screens/auth/register_screen.dart';
@@ -20,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  
+
   // New variable to track Caps Lock state
   bool _isCapsLockOn = false;
 
@@ -43,8 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
   // This function runs every time a key is pressed
   bool _onKey(KeyEvent event) {
     // Check if the system says Caps Lock is currently active
-    final newCapsLockStatus = HardwareKeyboard.instance.lockModesEnabled.contains(KeyboardLockMode.capsLock);
-    
+    final newCapsLockStatus = HardwareKeyboard.instance.lockModesEnabled
+        .contains(KeyboardLockMode.capsLock);
+
     // Only update the UI if the state actually changed
     if (_isCapsLockOn != newCapsLockStatus) {
       setState(() {
@@ -63,9 +64,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final cleanEmail = _emailController.text.trim().toLowerCase();
 
-    final user = await AuthService.login(
-      email: cleanEmail,
-      password: _passwordController.text,
+    final userMap = await ApiService.loginUser(
+      cleanEmail,
+      _passwordController.text,
     );
 
     if (mounted) {
@@ -73,7 +74,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = false;
       });
 
-      if (user != null) {
+      if (userMap != null) {
+        // Success! initialize data
         await RewardsService.initializeSampleData();
         await BusinessService.initializeSampleData();
 
@@ -190,22 +192,24 @@ class _LoginScreenState extends State<LoginScreen> {
                               return 'Please enter your email';
                             }
                             final cleanValue = value.trim().toLowerCase();
-                            final emailRegex = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
-                            
+                            final emailRegex = RegExp(
+                                r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+
                             if (!emailRegex.hasMatch(cleanValue)) {
                               return 'Please enter a valid email';
                             }
                             return null;
                           },
                         ),
-                        
+
                         // --- CAPS LOCK WARNING ---
                         // Only shows up if _isCapsLockOn is true
                         Visibility(
                           visible: _isCapsLockOn,
                           child: Container(
                             margin: const EdgeInsets.only(top: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.amber.withValues(),
                               borderRadius: BorderRadius.circular(8),
@@ -213,7 +217,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.warning_amber_rounded, size: 20, color: Colors.amber[800]),
+                                Icon(Icons.warning_amber_rounded,
+                                    size: 20, color: Colors.amber[800]),
                                 const SizedBox(width: 8),
                                 Text(
                                   "Caps Lock is ON",
@@ -227,9 +232,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        
+
                         const SizedBox(height: 16),
-                        
+
                         // Password Field
                         TextFormField(
                           controller: _passwordController,
@@ -243,10 +248,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
                                 color: theme.colorScheme.onSurface.withValues(),
                               ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -255,14 +263,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             fillColor: theme.colorScheme.surface,
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty) return 'Please enter your password';
-                            if (value.length < 6) return 'Password must be at least 6 characters';
+                            if (value == null || value.isEmpty)
+                              return 'Please enter your password';
+                            if (value.length < 6)
+                              return 'Password must be at least 6 characters';
                             return null;
                           },
                         ),
-                        
+
                         const SizedBox(height: 32),
-                        
+
                         // Login Button
                         SizedBox(
                           width: double.infinity,
@@ -288,7 +298,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   )
                                 : Text(
                                     'Login',
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       color: theme.colorScheme.onPrimary,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -300,7 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   const SizedBox(height: 24),
-                  
+
                   // Register Link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -324,12 +335,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Merchant Login Link
                   Center(
                     child: TextButton.icon(
                       onPressed: _navigateToMerchantLogin,
-                      icon: Icon(Icons.storefront, color: theme.colorScheme.secondary),
+                      icon: Icon(Icons.storefront,
+                          color: theme.colorScheme.secondary),
                       label: Text(
                         'Merchant Login',
                         style: theme.textTheme.bodyMedium?.copyWith(
