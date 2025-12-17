@@ -37,25 +37,39 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
-    // Sanitize ID
-    String rawId = json['id'].toString();
+    // 1. SAFELY GET THE ID
+    // Check 'id' first, if missing check '_id', if both missing use empty string
+    var idValue = json['id'] ?? json['_id'];
+    String rawId = idValue?.toString() ?? '';
+
+    // 2. CLEAN THE MONGODB FORMAT
+    // Removes 'ObjectId("...")' wrapper if present
     if (rawId.startsWith('ObjectId("')) {
       rawId = rawId.substring(10, 34);
     }
 
     return User(
       id: rawId,
-      email: json['email'] as String,
-      name: json['name'] as String,
+      // 3. SAFE STRING HANDLING (Prevents crash if null)
+      email: json['email'] as String? ?? '',
+      name: json['name'] as String? ?? 'User', // Defaults to 'User' if null
       avatar: json['avatar'] as String?,
+
       activatedBusinessIds: List<String>.from(
         json['activated_business_ids'] as List<dynamic>? ?? [],
       ),
-      // Parse new keys
+
       pointsBalance: (json['points_balance'] as num?)?.toInt() ?? 0,
       pointsRate: (json['points_per_unit'] as num?)?.toDouble(),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+
+      // 4. SAFE DATE PARSING
+      // If date is missing/null, use current time instead of crashing
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 

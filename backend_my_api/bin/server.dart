@@ -176,7 +176,8 @@ void main(List<String> args) async {
     final result = _mapDoc(user);
     result.remove('password');
     result.remove('password_hash');
-    return Response.ok(jsonEncode({'user': result, 'token': token}));
+    return Response.ok(jsonEncode(
+        {'user': result, 'name': user['name'] ?? 'No Name', 'token': token}));
   });
 
   // (JWT verification is handled inline for protected routes)
