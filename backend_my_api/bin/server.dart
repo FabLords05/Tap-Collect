@@ -179,29 +179,7 @@ void main(List<String> args) async {
     return Response.ok(jsonEncode({'user': result, 'token': token}));
   });
 
-  // JWT middleware helper
-  Middleware jwtMiddleware() {
-    final secret = env['JWT_SECRET'] ?? 'dev-secret';
-    return (Handler innerHandler) {
-      return (Request request) async {
-        // Allow OPTIONS through
-        if (request.method == 'OPTIONS') return innerHandler(request);
-        final auth = request.headers['authorization'];
-        if (auth == null || !auth.startsWith('Bearer ')) {
-          return Response(401, body: jsonEncode({'error': 'Unauthorized'}));
-        }
-        final token = auth.substring(7);
-        try {
-          final jwt = JWT.verify(token, SecretKey(secret));
-          final userId = jwt.payload['sub'] as String?;
-          final reqWithCtx = request.change(context: {'userId': userId});
-          return await innerHandler(reqWithCtx);
-        } catch (e) {
-          return Response(401, body: jsonEncode({'error': 'Invalid token'}));
-        }
-      };
-    };
-  }
+  // (JWT verification is handled inline for protected routes)
 
   // --- USERS ROUTES ---
   router.get('/users', (_) async {
