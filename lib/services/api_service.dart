@@ -72,7 +72,13 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        if (body.containsKey('token')) {
+          try {
+            await StorageService.saveAuthToken(body['token'] as String);
+          } catch (_) {}
+        }
+        return body;
       }
       return null;
     } catch (e) {
@@ -121,7 +127,17 @@ class ApiService {
         body: jsonEncode({"email": email, "password": password}),
       );
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        // If server returned a token, persist it for subsequent requests
+        if (body.containsKey('token')) {
+          try {
+            await StorageService.saveAuthToken(body['token'] as String);
+          } catch (_) {}
+        }
+        // Normalize response: return merchant object if wrapped
+        if (body.containsKey('merchant'))
+          return body['merchant'] as Map<String, dynamic>;
+        return body as Map<String, dynamic>;
       }
       return null;
     } catch (e) {
@@ -139,6 +155,10 @@ class ApiService {
     final url = Uri.parse('$baseUrl/transactions');
     try {
       final headers = await _buildHeaders();
+      // Debug: confirm whether token will be sent (avoid printing the token itself)
+      if (!headers.containsKey('Authorization')) {
+        print('EarnPoints: no Authorization token present in headers');
+      }
       final response = await http.post(
         url,
         headers: headers,

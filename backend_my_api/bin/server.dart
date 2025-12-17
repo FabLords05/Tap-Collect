@@ -407,15 +407,49 @@ void main(List<String> args) async {
     // 1. Check MERCHANTS collection (expects a 'password' field if using server-side creds)
     final merchant = await merchantsCol.findOne(where.eq('email', email));
 
-    if (merchant == null || merchant['password'] != data['password']) {
+    if (merchant == null) {
+      return Response(401,
+          body: jsonEncode({'error': 'Invalid merchant credentials'}));
+    }
+
+    final storedHash = merchant['password_hash'] as String?;
+    final legacyPlain = merchant['password'] as String?;
+    bool ok = false;
+
+    if (storedHash != null) {
+      ok = BCrypt.checkpw(data['password'] as String? ?? '', storedHash);
+    } else if (legacyPlain != null) {
+      if (data['password'] == legacyPlain) {
+        ok = true;
+        final newHash =
+            BCrypt.hashpw(data['password'] as String, BCrypt.gensalt());
+        await merchantsCol.updateOne(where.eq('_id', merchant['_id']), {
+          r'$set': {'password_hash': newHash},
+          r'$unset': {'password': ''}
+        });
+      }
+    }
+
+    if (!ok) {
       return Response(401,
           body: jsonEncode({'error': 'Invalid merchant credentials'}));
     }
 
     final result = _mapDoc(merchant);
-    // Remove password before returning
     result.remove('password');
-    return Response.ok(jsonEncode(result));
+    result.remove('password_hash');
+
+    // Issue JWT for merchant
+    final jwt = JWT({
+      'sub': merchant['_id']?.toString(),
+      'email': merchant['email'],
+      'role': 'merchant',
+    });
+    final secret = env['JWT_SECRET'] ?? 'dev-secret';
+    final token =
+        jwt.sign(SecretKey(secret), expiresIn: const Duration(days: 7));
+
+    return Response.ok(jsonEncode({'merchant': result, 'token': token}));
   });
 
   router.post('/merchants', (req) async {

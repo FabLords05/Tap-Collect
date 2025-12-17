@@ -44,7 +44,7 @@ class AuthService {
         await StorageService.saveAuthToken(token);
       }
 
-      final user = User.fromJson(userJson as Map<String, dynamic>);
+      final user = User.fromJson(userJson);
       await StorageService.saveUser(user.toJson());
       _currentUser = user;
       return user;
