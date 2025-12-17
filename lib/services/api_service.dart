@@ -164,6 +164,7 @@ class ApiService {
         headers: headers,
         body: jsonEncode({
           // user_id is taken from JWT on server-side; client should not pass it.
+          "user_id": userId,
           "business_id": businessId,
           "type": "EARN",
           "points": amount,

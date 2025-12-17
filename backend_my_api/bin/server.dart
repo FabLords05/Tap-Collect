@@ -300,12 +300,13 @@ void main(List<String> args) async {
       return Response(400, body: jsonEncode({'error': 'points required'}));
     }
 
-    final String userIdStr = userIdFromToken!;
+    final String targetUserId = data['user_id'] ?? userIdFromToken!;
+
     final int points = data['points'];
     final now = DateTime.now().toIso8601String();
 
     final doc = {
-      'user_id': userIdStr,
+      'user_id': targetUserId, // Use the detected target ID
       'business_id': data['business_id'] ?? 'unknown',
       'type': data['type'] ?? 'EARN',
       'points': points,
@@ -318,10 +319,11 @@ void main(List<String> args) async {
 
     // Update wallet balance
     try {
-      final userObjectId = ObjectId.parse(userIdStr);
+      final userObjectId =
+          ObjectId.parse(targetUserId); // Use targetUserId here too
       await usersCol.updateOne(
           where.eq('_id', userObjectId), modify.inc('points_balance', points));
-      print("✅ Updated balance for user $userIdStr by $points points");
+      print("✅ Updated balance for user $targetUserId by $points points");
     } catch (e) {
       print("❌ Error updating user balance: $e");
     }
