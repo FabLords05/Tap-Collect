@@ -9,6 +9,7 @@ class StorageService {
   static const String _businessesKey = 'businesses';
   static const String _pointsBalanceKey = 'points_balance';
   static const String _appModeKey = 'app_mode';
+  static const String _authTokenKey = 'auth_token';
 
   static Future<SharedPreferences> get _prefs async {
     return await SharedPreferences.getInstance();
@@ -157,5 +158,21 @@ class StorageService {
   static Future<void> clearAll() async {
     final prefs = await _prefs;
     await prefs.clear();
+  }
+
+  // Auth token methods (store JWT securely if desired)
+  static Future<void> saveAuthToken(String token) async {
+    final prefs = await _prefs;
+    await prefs.setString(_authTokenKey, token);
+  }
+
+  static Future<String?> loadAuthToken() async {
+    final prefs = await _prefs;
+    return prefs.getString(_authTokenKey);
+  }
+
+  static Future<void> clearAuthToken() async {
+    final prefs = await _prefs;
+    await prefs.remove(_authTokenKey);
   }
 }

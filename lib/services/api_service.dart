@@ -80,6 +80,14 @@ class ApiService {
     }
   }
 
+  // Helper to build headers with optional Authorization
+  static Future<Map<String, String>> _buildHeaders() async {
+    final token = await StorageService.loadAuthToken();
+    final headers = {'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+    return headers;
+  }
+
   // 4. Update User (RESTORED - Critical for Business Activation)
   static Future<bool> updateUser(
       String userId, Map<String, dynamic> data) async {
@@ -130,11 +138,12 @@ class ApiService {
   }) async {
     final url = Uri.parse('$baseUrl/transactions');
     try {
+      final headers = await _buildHeaders();
       final response = await http.post(
         url,
-        headers: {"Content-Type": "application/json"},
+        headers: headers,
         body: jsonEncode({
-          "user_id": userId,
+          // user_id is taken from JWT on server-side; client should not pass it.
           "business_id": businessId,
           "type": "EARN",
           "points": amount,
@@ -148,7 +157,8 @@ class ApiService {
       }
       // Log failure for debugging
       try {
-        print('❌ EarnPoints failed: status=${response.statusCode}, body=${response.body}');
+        print(
+            '❌ EarnPoints failed: status=${response.statusCode}, body=${response.body}');
       } catch (_) {}
       return false;
     } catch (e) {
@@ -194,13 +204,14 @@ class ApiService {
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-          final body = jsonDecode(response.body) as Map<String, dynamic>;
-          final user = User.fromJson(body);
-          // Persist server-provided balance locally (per-user)
-          try {
-            await StorageService.savePointsBalanceForUser(user.id, user.pointsBalance);
-          } catch (_) {}
-          return user;
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final user = User.fromJson(body);
+        // Persist server-provided balance locally (per-user)
+        try {
+          await StorageService.savePointsBalanceForUser(
+              user.id, user.pointsBalance);
+        } catch (_) {}
+        return user;
       }
       return null;
     } catch (e, st) {

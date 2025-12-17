@@ -31,13 +31,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Transaction> _recentTransactions = [];
   bool _isLoading = true;
 
-  late String _currentBusinessId;
+  String? _currentBusinessId;
   bool _isBusinessActivated = false;
 
   @override
   void initState() {
     super.initState();
-    _currentBusinessId = 'sample-biz';
+    // Try to use the first activated business from the local user cache.
+    // The backend refresh in `_loadDashboardData()` will update this.
+    _currentBusinessId =
+        AuthService.currentUser?.activatedBusinessIds.isNotEmpty == true
+            ? AuthService.currentUser!.activatedBusinessIds.first
+            : null;
     // Quickly load the cached balance so the UI shows the user's points
     // as soon as possible while the full dashboard refresh runs.
     PointsService.getBalance().then((balance) {
@@ -58,29 +63,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _checkBusinessActivation() {
     setState(() {
-      _isBusinessActivated = BusinessActivationService.isBusinessActivated(
-        _currentBusinessId,
-      );
+      _isBusinessActivated = _currentBusinessId != null &&
+          BusinessActivationService.isBusinessActivated(
+            _currentBusinessId!,
+          );
     });
   }
 
   void _onBusinessActivationComplete() {
+    // Refresh the current business id from the updated user
+    final updated = AuthService.currentUser;
+    if (updated != null && updated.activatedBusinessIds.isNotEmpty) {
+      setState(() {
+        _currentBusinessId = updated.activatedBusinessIds.first;
+      });
+    } else {
+      setState(() {
+        _currentBusinessId = null;
+      });
+    }
     _checkBusinessActivation();
   }
 
   Future<void> _loadDashboardData() async {
     try {
       final user = AuthService.currentUser;
-      
+
       // Fetch fresh data from backend (MongoDB)
       if (user != null) {
         final userFromBackend = await ApiService.getUser(user.id);
         if (userFromBackend != null) {
           // Update local storage with backend data
           await AuthService.updateCurrentUser(userFromBackend);
+          // Update active business id from backend user if available
+          if (userFromBackend.activatedBusinessIds.isNotEmpty) {
+            _currentBusinessId = userFromBackend.activatedBusinessIds.first;
+          } else {
+            _currentBusinessId = null;
+          }
+          _checkBusinessActivation();
         }
       }
-      
+
       // Now load balance and transactions from storage
       final balance = await PointsService.getBalance();
       final transactions = await TransactionService.getRecentTransactions(5);
@@ -113,6 +137,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = AuthService.currentUser;
     if (user == null) return;
 
+    if (_currentBusinessId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activate a business first to collect points.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     // 1. Optimistic Update (Update screen instantly)
     setState(() {
       _pointsBalance += points;
@@ -122,7 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool success = await ApiService.earnPoints(
       userId: user.id,
       amount: points,
-      businessId: _currentBusinessId,
+      businessId: _currentBusinessId!,
     );
 
     if (success) {
@@ -234,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         const SizedBox(height: 24),
                         if (!_isBusinessActivated)
                           BusinessActivationButton(
-                            businessId: _currentBusinessId,
+                            businessId: _currentBusinessId ?? 'sample-biz',
                             businessName: 'This Business',
                             onActivationComplete: _onBusinessActivationComplete,
                           )
@@ -243,7 +277,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               onPointsCollected: _onPointsCollected)
                         else
                           QRCollectionWidget(
-                            businessId: _currentBusinessId,
+                            businessId: _currentBusinessId ?? 'sample-biz',
                             onPointsCollected: _onPointsCollected,
                           ),
                         const SizedBox(height: 32),

@@ -5,6 +5,8 @@ import 'package:mongo_dart/mongo_dart.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:bcrypt/bcrypt.dart';
+import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 
 // --- Helper Functions ---
 String? _idFromInsertResult(dynamic res, Map<String, dynamic> doc) {
@@ -95,10 +97,14 @@ void main(List<String> args) async {
     }
 
     final now = DateTime.now().toIso8601String();
+    // Hash password before storing
+    final rawPassword = data['password'] as String;
+    final hashed = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
+
     final doc = {
       'email': email,
       'name': name,
-      'password': data['password'],
+      'password_hash': hashed,
       'avatar': data['avatar'] ?? 'default.png',
       'points_balance': 0, // Initialize wallet
       'activated_business_ids': [],
@@ -129,15 +135,73 @@ void main(List<String> args) async {
     final email = _normalizeEmail(data['email'] as String?);
     final user = await usersCol.findOne(where.eq('email', email));
 
-    if (user == null || user['password'] != data['password']) {
+    if (user == null) {
       return Response(401,
           body: jsonEncode({'error': 'Invalid email or password'}));
     }
 
+    final storedHash = user['password_hash'] as String?;
+    final legacyPlain = user['password'] as String?;
+    bool ok = false;
+
+    if (storedHash != null) {
+      ok = BCrypt.checkpw(data['password'] as String? ?? '', storedHash);
+    } else if (legacyPlain != null) {
+      // Migrate legacy plaintext password to hash on successful check
+      if (data['password'] == legacyPlain) {
+        ok = true;
+        final newHash =
+            BCrypt.hashpw(data['password'] as String, BCrypt.gensalt());
+        await usersCol.updateOne(where.eq('_id', user['_id']), {
+          r'$set': {'password_hash': newHash},
+          r'$unset': {'password': ''}
+        });
+      }
+    }
+
+    if (!ok) {
+      return Response(401,
+          body: jsonEncode({'error': 'Invalid email or password'}));
+    }
+
+    // Issue JWT
+    final jwt = JWT({
+      'sub': user['_id']?.toString(),
+      'email': user['email'],
+    });
+    final secret = env['JWT_SECRET'] ?? 'dev-secret';
+    final token =
+        jwt.sign(SecretKey(secret), expiresIn: const Duration(days: 7));
+
     final result = _mapDoc(user);
     result.remove('password');
-    return Response.ok(jsonEncode(result));
+    result.remove('password_hash');
+    return Response.ok(jsonEncode({'user': result, 'token': token}));
   });
+
+  // JWT middleware helper
+  Middleware jwtMiddleware() {
+    final secret = env['JWT_SECRET'] ?? 'dev-secret';
+    return (Handler innerHandler) {
+      return (Request request) async {
+        // Allow OPTIONS through
+        if (request.method == 'OPTIONS') return innerHandler(request);
+        final auth = request.headers['authorization'];
+        if (auth == null || !auth.startsWith('Bearer ')) {
+          return Response(401, body: jsonEncode({'error': 'Unauthorized'}));
+        }
+        final token = auth.substring(7);
+        try {
+          final jwt = JWT.verify(token, SecretKey(secret));
+          final userId = jwt.payload['sub'] as String?;
+          final reqWithCtx = request.change(context: {'userId': userId});
+          return await innerHandler(reqWithCtx);
+        } catch (e) {
+          return Response(401, body: jsonEncode({'error': 'Invalid token'}));
+        }
+      };
+    };
+  }
 
   // --- USERS ROUTES ---
   router.get('/users', (_) async {
@@ -236,15 +300,29 @@ void main(List<String> args) async {
 
   // --- TRANSACTIONS (Points Logic) ---
   router.post('/transactions', (req) async {
+    // Require Authorization header and validate JWT
+    final auth = req.headers['authorization'];
+    if (auth == null || !auth.startsWith('Bearer ')) {
+      return Response(401, body: jsonEncode({'error': 'Unauthorized'}));
+    }
+    final token = auth.substring(7);
+    final secret = env['JWT_SECRET'] ?? 'dev-secret';
+    String? userIdFromToken;
+    try {
+      final jwt = JWT.verify(token, SecretKey(secret));
+      userIdFromToken = jwt.payload['sub'] as String?;
+    } catch (e) {
+      return Response(401, body: jsonEncode({'error': 'Invalid token'}));
+    }
+
     final body = await req.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    if (data['user_id'] == null || data['points'] == null) {
-      return Response(400,
-          body: jsonEncode({'error': 'user_id and points required'}));
+    if (data['points'] == null) {
+      return Response(400, body: jsonEncode({'error': 'points required'}));
     }
 
-    final String userIdStr = data['user_id'];
+    final String userIdStr = userIdFromToken!;
     final int points = data['points'];
     final now = DateTime.now().toIso8601String();
 
@@ -263,7 +341,7 @@ void main(List<String> args) async {
     // Update wallet balance
     try {
       final userObjectId = ObjectId.parse(userIdStr);
-      await usersCol.update(
+      await usersCol.updateOne(
           where.eq('_id', userObjectId), modify.inc('points_balance', points));
       print("✅ Updated balance for user $userIdStr by $points points");
     } catch (e) {

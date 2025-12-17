@@ -31,22 +31,22 @@ class AuthService {
   }) async {
     try {
       // 1. Call the Server
-      final userData = await ApiService.loginUser(email, password);
+      final resp = await ApiService.loginUser(email, password);
 
       // 2. If server returned null, login failed
-      if (userData == null) {
-        return null;
+      if (resp == null) return null;
+
+      // Expect server to return { user: {...}, token: '...' }
+      final token = resp['token'] as String?;
+      final userJson = resp['user'] as Map<String, dynamic>? ?? resp;
+
+      if (token != null) {
+        await StorageService.saveAuthToken(token);
       }
 
-      // 3. Convert JSON to User Object
-      final user = User.fromJson(userData);
-
-      // 4. Save to Local Storage (Keep me logged in)
+      final user = User.fromJson(userJson as Map<String, dynamic>);
       await StorageService.saveUser(user.toJson());
-      
-      // 5. Update State
       _currentUser = user;
-      
       return user;
     } catch (e, st) {
       AppLogger.error("AuthService Login Error: $e", e, st);
@@ -62,7 +62,7 @@ class AuthService {
   }) async {
     // We try to create the account
     bool success = await ApiService.registerUser(name, email, password);
-    
+
     if (success) {
       // If successful, we automatically log them in
       return await login(email: email, password: password);
@@ -97,5 +97,6 @@ class AuthService {
   static Future<void> logout() async {
     _currentUser = null;
     await StorageService.clearUser();
+    await StorageService.clearAuthToken();
   }
 }
