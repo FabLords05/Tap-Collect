@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Ensure this is imported
+import 'package:grove_rewards/services/auth_service.dart'; // Ensure this is imported
 import 'package:flutter/services.dart'; // Needed for Keyboard detection
 import 'package:grove_rewards/services/api_service.dart';
 import 'package:grove_rewards/services/rewards_service.dart';
@@ -63,6 +64,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final cleanEmail = _emailController.text.trim().toLowerCase();
+
+    final user = await AuthService.login(
+      email: cleanEmail,
+      password: _passwordController.text,
+    );
 
     final userMap = await ApiService.loginUser(
       cleanEmail,
